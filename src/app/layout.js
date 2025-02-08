@@ -22,7 +22,16 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        {/* Banner */}
+        <div className="bg-primary text-black w-full py-6 fixed top-0 left-0 border-b border-gray z-10">
+          <h1 className="text-5xl font-bold text-center">
+            <span className="font-extrabold">625</span>
+            <span className="font-normal">Tutor</span>
+          </h1>
+        </div>
+        <div className="mt-24">
+          {children}
+        </div>
       </body>
     </html>
   );
