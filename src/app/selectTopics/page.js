@@ -133,7 +133,7 @@ const SelectMathsTopics = () => {
                     <button
                         type="button"
                         onClick={handleContinue}
-                        className="flex items-center justify-center w-full px-4 py-2 rounded bg-green-500 text-white hover:bg-green-700 transition"
+                        className="flex items-center justify-center w-full px-4 py-2 rounded bg-green text-white hover:bg-green-700 transition"
                     >
                         Continue
                     </button>

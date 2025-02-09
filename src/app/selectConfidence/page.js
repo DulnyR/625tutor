@@ -125,7 +125,7 @@ const SelectConfidence = () => {
                     <button
                         type="button"
                         onClick={handleContinue}
-                        className={`flex items-center justify-center w-full px-4 py-2 rounded transition ${allConfidenceLevelsSet ? 'bg-green-500 text-white hover:bg-green-700' : 'bg-gray cursor-not-allowed'}`}
+                        className={`flex items-center justify-center w-full px-4 py-2 rounded transition ${allConfidenceLevelsSet ? 'bg-green text-white hover:bg-green-700' : 'bg-gray cursor-not-allowed'}`}
                         disabled={!allConfidenceLevelsSet}
                     >
                         Continue

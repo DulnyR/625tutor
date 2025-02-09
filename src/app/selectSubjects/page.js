@@ -115,7 +115,7 @@ const SelectSubjects = () => {
             setError(`Error inserting user study data: ${insertError.message || JSON.stringify(insertError)}`);
         } else {
             console.log('Data inserted successfully:', data);
-            router.push(`/selectConfidence?subjects=${selectedSubjects.join(',')}&levels=${selectedLevels.join(',')}`);
+            router.push(`/selectConfidence`);
         }
     };
 
@@ -186,7 +186,7 @@ const SelectSubjects = () => {
                 <button
                     type="button"
                     onClick={handleContinue}
-                    className={`flex items-center justify-center mt-6 px-4 py-2 rounded transition w-full ${allFieldsFilled ? 'bg-green-500 text-white hover:bg-green-700' : 'bg-gray cursor-not-allowed'}`}
+                    className={`flex items-center justify-center mt-6 px-4 py-2 rounded transition w-full ${allFieldsFilled ? 'bg-green text-white hover:bg-green-700' : 'bg-gray cursor-not-allowed'}`}
                     disabled={!allFieldsFilled}
                 >
                     Continue
