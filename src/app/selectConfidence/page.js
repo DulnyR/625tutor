@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { supabase } from '../../lib/supabaseClient';
 import '../globals.css';
 
 const SelectConfidence = () => {
@@ -12,6 +13,7 @@ const SelectConfidence = () => {
 
     const [subjects, setSubjects] = useState([]);
     const [confidenceLevels, setConfidenceLevels] = useState({});
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         if (subjectsQuery && levelsQuery) {
@@ -44,10 +46,54 @@ const SelectConfidence = () => {
 
     const allConfidenceLevelsSet = subjects.every(subject => confidenceLevels[subject.name] !== undefined);
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (allConfidenceLevelsSet) {
-            console.log('Continue with:', confidenceLevels);
-            router.push('/selectMathsTopics');
+            // Check if user is authenticated
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                setError('User not authenticated. Please log in.');
+                return;
+            }
+
+            const supabaseUserId = user.id;
+
+            // Fetch the user from the users table using the Supabase user ID
+            const { data: userData, error: userFetchError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('supabase_user_id', supabaseUserId)
+                .single();
+
+            if (userFetchError || !userData) {
+                setError('User not found in the users table.');
+                return;
+            }
+
+            const userId = userData.id;
+
+            // Update the confidence_level for each subject in the user_study_data table
+            const updates = subjects.map(async (subject) => {
+                const { error: updateError } = await supabase
+                    .from('user_study_data')
+                    .update({ confidence_level: confidenceLevels[subject.name] })
+                    .eq('user_id', userId)
+                    .eq('subject', subject.name);
+
+                if (updateError) {
+                    console.error('Error updating confidence level:', updateError);
+                    return null;
+                }
+
+                return subject.name;
+            });
+
+            const results = await Promise.all(updates);
+
+            if (results.includes(null)) {
+                setError('Error updating confidence levels. Please try again.');
+            } else {
+                router.push('/selectTopics');
+            }
         }
     };
 
@@ -85,6 +131,7 @@ const SelectConfidence = () => {
                         Continue
                     </button>
                 </div>
+                {error && <p className="text-red-500 mt-4">{error}</p>}
             </div>
         </div>
     );
