@@ -57,3 +57,30 @@ input[type="range"].range-sm::-moz-range-thumb {
   border-radius: 50%;
   border: none;
 }
+
+.flashcard-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flashcard {
+  position: absolute;
+  width: 80%; /* Adjust the width as needed */
+  max-width: 600px; /* Optional: set a maximum width */
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.flashcard.current {
+  transform: translate(0, 0);
+  opacity: 1;
+}
+
+.flashcard:not(.current) {
+  transform: translate(10px, 10px) scale(1, 1.6); /* Reduce the offset to bring the cards closer */
+  opacity: 0.9; /* Slightly increase the opacity */
+}
+

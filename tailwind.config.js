@@ -11,8 +11,6 @@ module.exports = {
         gray: '#D1D5DB',  // Light Gray
         darkGray: '#374151',  // Dark Gray
         yellow: '#F59E0B',  // Soft Yellow
-        green: '#10B981',  // Soft Green
-        darkGray: '#374151',  // Dark Gray
       },
     },
   },

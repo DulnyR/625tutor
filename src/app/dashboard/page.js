@@ -29,7 +29,7 @@ const Dashboard = () => {
 
     const { data: userData, error: userDataError } = await supabase
       .from('users')
-      .select('id, username, study_time, total_time, streak')
+      .select('id, username, study_time_today, streak, last_time_studied')
       .eq('supabase_user_id', supabaseUserId)
       .single();
 
@@ -40,9 +40,28 @@ const Dashboard = () => {
 
     const userId = userData.id;
     setUsername(userData.username);
-    setStudyGoal(userData.study_time);
-    setTotalStudyTime(userData.total_time);
     setStudyStreak(userData.streak);
+
+    const lastTimeStudied = new Date(userData.last_time_studied);
+    const now = new Date();
+    const isSameDay = lastTimeStudied.toDateString() === now.toDateString();
+
+    if (!isSameDay) {
+      // Reset study_time_today to 0 if last_time_studied is not today
+      const { error } = await supabase
+        .from('users')
+        .update({ study_time_today: 0 })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error resetting study_time_today:', error);
+        return;
+      }
+
+      setStudyGoal(0);
+    } else {
+      setStudyGoal(userData.study_time_today);
+    }
 
     const { data: studyData, error: studyDataError } = await supabase
       .from('user_study_data')
@@ -60,6 +79,10 @@ const Dashboard = () => {
     }
 
     setSubjects(studyData);
+
+    // Calculate the total study time by summing the time_spent values
+    const totalTime = studyData.reduce((acc, row) => acc + row.time_spent, 0);
+    setTotalStudyTime(totalTime);
   };
 
   const handleSubjectClick = (subject) => {
@@ -128,11 +151,11 @@ const Dashboard = () => {
     debouncedConfidenceChange(subject, newConfidenceLevel);
   };
 
-  const progressPercentage = Math.min((totalStudyTime / studyGoal) * 100, 100);
+  const progressPercentage = Math.min((studyGoal / 60) * 100, 100); // Assuming the daily goal is 1 hour (60 minutes)
   const progressColor = progressPercentage === 100 ? 'bg-green-500' : 'bg-blue-500';
 
   return (
-    <div className="flex min-h-screen bg-gray">
+    <div className="bg-gradient-to-br from-purple-200 to-blue-100 flex min-h-screen ">
       <aside className="w-1/2 pl-2 pt-2 pb-2 text-black">
         {/* Greeting Box */}
         <div className="bg-white p-6 shadow-lg rounded-lg mb-2">
@@ -145,11 +168,11 @@ const Dashboard = () => {
         </div>
 
         {/* Recommendation Box */}
-        <div className="bg-orange-500 p-6 shadow-lg rounded-lg mb-2">
+        <div className="bg-gradient-to-br from-orange-500 to-purple-500 p-6 shadow-lg rounded-lg mb-2">
           <h2 className="text-2xl font-bold text-white mb-2">
             625<span className="font-normal">Tutor</span> Recommendation
           </h2>
-          <div className="bg-white p-6 shadow-lg rounded-lg mb-2 flex justify-between items-center">
+          <div className="bg-white p-6 shadow-xl rounded-lg mb-2 flex justify-between items-center">
             <h2 className="text-2xl font-bold text-black">
               {recommended}
             </h2>
@@ -195,7 +218,7 @@ const Dashboard = () => {
           <h2 className="text-2xl font-bold text-black mb-4">Update Confidence Levels</h2>
           <div className="space-y-4">
             {subjects.map((subject) => (
-              <div key={subject.subject} className="bg-light-gray p-4 rounded-lg shadow-md">
+              <div key={subject.subject} className="bg-white p-4 rounded-lg shadow-lg border border-purple-200">
                 <div className="flex items-center justify-between">
                   {/* Subject Name */}
                   <h3 className="text-xl font-semibold text-black">
@@ -204,7 +227,7 @@ const Dashboard = () => {
 
                   {/* Slider and Current Value */}
                   <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-black">
                         Not Confident
                     </span>
                     <input
@@ -213,9 +236,9 @@ const Dashboard = () => {
                       max="10"
                       value={subject.confidence_level || 1}
                       onChange={(e) => handleSliderChange(subject.subject, parseInt(e.target.value))}
-                      className="w-60 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-sm"
+                      className="w-50 h-2 bg-blue-500 rounded-lg appearance-none cursor-pointer range-sm"
                     />
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-black">
                         Very Confident
                     </span>
                   </div>
@@ -232,7 +255,7 @@ const Dashboard = () => {
           <h2 className="text-2xl font-bold mb-6 text-black">Subjects</h2>
           <div className="space-y-4">
             {subjects.map((subject) => (
-              <div key={subject.subject} className="bg-light-gray p-4 rounded-lg shadow-md">
+              <div key={subject.subject} className="bg-white p-4 rounded-lg shadow-lg border border-purple-200">
                 <div className="flex justify-between items-center mt-3">
                   <button
                     onClick={() => handleSubjectClick(subject.subject)}
@@ -247,7 +270,7 @@ const Dashboard = () => {
                     <button className="bg-blue-500 text-white p-2 rounded">
                       Flashcards
                     </button>
-                    <button className="bg-green text-white p-2 rounded">
+                    <button className="bg-green-500 text-white p-2 rounded">
                       Exam Questions
                     </button>
                   </div>

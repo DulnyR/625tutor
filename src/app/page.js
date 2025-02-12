@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 import './globals.css';
@@ -13,6 +13,19 @@ export default function HomePage() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState(null);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+
+  useEffect(() => {
+    const handleLogout = async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setError(error.message);
+      } else {
+        router.push("/");
+      }
+    };
+
+    handleLogout();
+  }, [router]);
 
   const handleAuth = async () => {
     setError(null);
@@ -42,10 +55,30 @@ export default function HomePage() {
                     if (updateError) {
                         setError(updateError.message);
                     } else {
-                        router.push("/selectSubjects");
+                        // Check if the user has subjects and confidence levels chosen
+                        const { data: userSubjects, error: userSubjectsError } = await supabase
+                            .from('user_study_data')
+                            .select('id')
+                            .eq('user_id', existingUser.id);
+
+                        if (userSubjectsError || userSubjects.length === 0) {
+                            router.push("/selectSubjects");
+                        } else {
+                            router.push("/dashboard");
+                        }
                     }
                 } else {
-                    router.push("/selectSubjects");
+                    // Check if the user has subjects and confidence levels chosen
+                    const { data: userSubjects, error: userSubjectsError } = await supabase
+                        .from('user_study_data')
+                        .select('id')
+                        .eq('user_id', existingUser.id);
+
+                    if (userSubjectsError || userSubjects.length === 0) {
+                        router.push("/selectSubjects");
+                    } else {
+                        router.push("/dashboard");
+                    }
                 }
             }
         }

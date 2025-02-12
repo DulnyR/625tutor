@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
+    "jszip": "^3.10.1",
     "next": "15.1.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sql.js": "^1.12.0",
+    "sql.js-httpvfs": "^0.8.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

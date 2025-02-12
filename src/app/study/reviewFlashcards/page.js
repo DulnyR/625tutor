@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient';
-import '../globals.css';
+import { supabase } from '../../../lib/supabaseClient';
+import '../../globals.css';
 
 const ReviewFlashcards = () => {
     const router = useRouter();
@@ -80,6 +80,20 @@ const ReviewFlashcards = () => {
         setCurrentFlashcardIndex((prevIndex) => (prevIndex + 1));
     };
 
+    const handleRemoveFlashcard = async (flashcardId) => {
+        const { error } = await supabase
+            .from('flashcards')
+            .delete()
+            .eq('id', flashcardId);
+
+        if (error) {
+            console.error('Error removing flashcard:', error);
+            return;
+        }
+
+        setFlashcards(flashcards.filter((flashcard) => flashcard.id !== flashcardId));
+    };
+
     const updateFlashcard = (flashcard, rating) => {
         let { ease_factor, repetitions, interval } = flashcard;
 
@@ -122,45 +136,61 @@ const ReviewFlashcards = () => {
 
     return (
         <div className="flex min-h-screen bg-gray text-black justify-center items-center">
-            <div className="bg-white p-6 shadow-lg rounded-lg w-1/2">
-                <h2 className="text-2xl font-bold mb-6 text-black">Review Flashcards</h2>
-                <div className="mb-4">
-                    <strong>Subject:</strong> {currentFlashcard.subject}
-                </div>
-                <div className="mb-4">
-                    <strong>Q:</strong> {currentFlashcard.front}
-                </div>
-                {showAnswer && (
-                    <div className="mb-4">
-                        <strong>A:</strong> {currentFlashcard.back}
-                    </div>
-                )}
-                {!showAnswer ? (
-                    <button
-                        onClick={handleShowAnswer}
-                        className="bg-blue-500 text-white p-2 rounded mb-4"
+            <div className="flashcard-stack">
+                {flashcards.slice(currentFlashcardIndex).map((flashcard, index) => (
+                    <div
+                        key={flashcard.id}
+                        className={`flashcard ${index === 0 ? 'current' : ''}`}
+                        style={{ zIndex: flashcards.length - index }}
                     >
-                        Show Answer
-                    </button>
-                ) : (
-                    <div className="flex space-x-2">
-                        {[
-                            { label: 'Again', value: 0 },
-                            { label: 'Hard', value: 1 },
-                            { label: 'Good', value: 3 },
-                            { label: 'Easy', value: 4 },
-                            { label: 'Very Easy', value: 5 },
-                        ].map((rating) => (
+                        <div className="bg-white p-6 shadow-lg rounded-lg w-full text-center relative">
                             <button
-                                key={rating.value}
-                                onClick={() => handleRating(rating.value)}
-                                className={`${ratingColors[rating.value]} text-white p-2 rounded`}
+                                onClick={() => handleRemoveFlashcard(flashcard.id)}
+                                className="absolute top-2 right-2 text-red-500 hover:text-red-700 text-lg"
                             >
-                                {rating.label}
+                                <i className="fas fa-trash"></i> Delete
                             </button>
-                        ))}
+                            <div className="mb-4 text-2xl">
+                                <strong>{flashcard.front}</strong>
+                            </div>
+                            {showAnswer && index === 0 && (
+                                <div className="mb-4 text-2xl">
+                                    {flashcard.back}
+                                </div>
+                            )}
+                            {!showAnswer && index === 0 ? (
+                                <button
+                                    onClick={handleShowAnswer}
+                                    className="bg-blue-500 text-white p-2 rounded mb-4"
+                                >
+                                    Show Answer
+                                </button>
+                            ) : (
+                                index === 0 && (
+                                    <>
+                                        <div className="flex justify-center space-x-2">
+                                            {[
+                                                { label: 'Again', value: 0 },
+                                                { label: 'Hard', value: 1 },
+                                                { label: 'Good', value: 3 },
+                                                { label: 'Easy', value: 4 },
+                                                { label: 'Very Easy', value: 5 },
+                                            ].map((rating) => (
+                                                <button
+                                                    key={rating.value}
+                                                    onClick={() => handleRating(rating.value)}
+                                                    className={`${ratingColors[rating.value]} text-white p-2 rounded`}
+                                                >
+                                                    {rating.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )
+                            )}
+                        </div>
                     </div>
-                )}
+                ))}
             </div>
         </div>
     );
