@@ -1,15 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import '../../globals.css';
+import LoadingScreen from '../loadingScreen';
 
 const AddFlashcards = () => {
     const [flashcards, setFlashcards] = useState([]);
     const [question, setQuestion] = useState('');
     const [answer, setAnswer] = useState('');
     const [subject, setSubject] = useState('');
+    const [showTips, setShowTips] = useState(true);
+    const [loading, setLoading] = useState(false);
     const searchParams = useSearchParams();
     const subjectFromAddress = searchParams.get('subject');
 
@@ -25,6 +28,8 @@ const AddFlashcards = () => {
             return;
         }
 
+        setLoading(true);
+
         const newFlashcard = { subject, front: question, back: answer };
         setFlashcards([...flashcards, newFlashcard]);
         setQuestion('');
@@ -33,6 +38,7 @@ const AddFlashcards = () => {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             console.error('User not authenticated. Please log in.');
+            setLoading(false);
             return;
         }
 
@@ -46,6 +52,7 @@ const AddFlashcards = () => {
 
         if (userDataError) {
             console.error('Error fetching user data:', userDataError);
+            setLoading(false);
             return;
         }
 
@@ -58,14 +65,19 @@ const AddFlashcards = () => {
         if (error) {
             console.error('Error saving flashcard:', error);
         }
+
+        setLoading(false);
     };
 
     const handleRemoveFlashcard = async (index) => {
+        setLoading(true);
+
         const flashcardToRemove = flashcards[index];
 
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             console.error('User not authenticated. Please log in.');
+            setLoading(false);
             return;
         }
 
@@ -79,6 +91,7 @@ const AddFlashcards = () => {
 
         if (userDataError) {
             console.error('Error fetching user data:', userDataError);
+            setLoading(false);
             return;
         }
 
@@ -94,10 +107,12 @@ const AddFlashcards = () => {
 
         if (error) {
             console.error('Error removing flashcard:', error);
+            setLoading(false);
             return;
         }
 
         setFlashcards(flashcards.filter((_, i) => i !== index));
+        setLoading(false);
     };
 
     const handleImportFromAnki = async () => {
@@ -111,6 +126,8 @@ const AddFlashcards = () => {
                 return;
             }
 
+            setLoading(true);
+
             try {
                 // Read the file as text
                 const fileText = await file.text();
@@ -119,29 +136,87 @@ const AddFlashcards = () => {
                 const lines = fileText.split('\n');
 
                 // Parse each line into a flashcard
-                const flashcards = lines.map(line => {
+                const importedFlashcards = lines.map(line => {
                     const [front, back] = line.split('\t'); // Split by tab character
-                    return { front, back };
+                    return { subject, front, back };
                 }).filter(card => card.front && card.back); // Filter out invalid lines
 
                 // Add the flashcards to the state
-                setFlashcards((prevFlashcards) => [...prevFlashcards, ...flashcards]);
+                setFlashcards((prevFlashcards) => [...prevFlashcards, ...importedFlashcards]);
 
-                alert(`${flashcards.length} flashcards imported successfully!`);
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                if (userError || !user) {
+                    console.error('User not authenticated. Please log in.');
+                    setLoading(false);
+                    return;
+                }
+
+                const supabaseUserId = user.id;
+
+                const { data: userData, error: userDataError } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('supabase_user_id', supabaseUserId)
+                    .single();
+
+                if (userDataError) {
+                    console.error('Error fetching user data:', userDataError);
+                    setLoading(false);
+                    return;
+                }
+
+                const userId = userData.id;
+
+                // Insert the imported flashcards into the database
+                const { error } = await supabase
+                    .from('flashcards')
+                    .insert(importedFlashcards.map(card => ({ ...card, user_id: userId })));
+
+                if (error) {
+                    console.error('Error saving imported flashcards:', error);
+                } else {
+                    alert(`${importedFlashcards.length} flashcards imported successfully!`);
+                }
             } catch (error) {
                 console.error('Error importing Anki deck:', error);
                 alert('Failed to import Anki deck. Please check the console for details.');
             }
+
+            setLoading(false);
         };
         fileInput.click();
     };
 
+    if (loading) {
+        return <LoadingScreen />;
+    }
+
     return (
-        <div className="flex flex-col min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black items-center">
-            {/* Add Flashcards Box */}
-            <main className="w-full max-w-2xl pt-20">
-                <div className="bg-white p-6 shadow-lg rounded-lg mb-6">
-                    {/* Title */}
+        <div className="flex flex-col min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black items-center pb-40 mt-16">
+            <div className={`flex w-full max-w-6xl pt-20 ${showTips ? '' : 'justify-center'}`}>
+                {/* Tips Box */}
+                {showTips && (
+                    <aside className="w-2/5 p-6 bg-white shadow-lg rounded-lg mr-6 sticky top-20">
+                        <h2 className="text-2xl font-bold mb-4 text-black">How to Create Flashcards</h2>
+                        <p className="mb-4">Flashcards are a great way to study and memorize information. Here are some tips on how to create effective flashcards:</p>
+                        <ul className="list-disc list-inside space-y-2">
+                            <li><strong>Keep it simple:</strong> Focus on one question and answer per card.</li>
+                            <li><strong>Be concise:</strong> Use short, clear questions and answers.</li>
+                            <li><strong>Review regularly:</strong> Go through your flashcards frequently to reinforce your memory.</li>
+                        </ul>
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => setShowTips(false)}
+                                className="mt-4 bg-orange-500 text-white p-2 rounded hover:bg-orange-600 transition duration-300"
+                            >
+                                Got it
+                            </button>
+                        </div>
+                    </aside>
+                )}
+
+                {/* Add Flashcards Box */}
+                <main className="w-3/5 p-6 bg-white shadow-lg rounded-lg">
                     <h2 className="text-2xl font-bold mb-6 text-black text-center">Add Flashcards</h2>
 
                     {/* Question Input */}
@@ -178,15 +253,15 @@ const AddFlashcards = () => {
                             onClick={handleImportFromAnki}
                             className="bg-purple-500 text-white p-2 rounded hover:bg-purple-600 transition duration-300"
                         >
-                            Import from Anki
+                            Import from Anki (.txt)
                         </button>
                     </div>
-                </div>
-            </main>
+                </main>
+            </div>
 
             {/* Flashcards List */}
             {flashcards.length > 0 && (
-                <div className="w-full max-w-2xl mb-20">
+                <div className="w-full max-w-2xl mt-10">
                     <div className="bg-white p-6 shadow-lg rounded-lg">
                         <h3 className="text-xl font-bold text-black mb-4 text-center">Added Flashcards</h3>
                         <ul className="space-y-4">

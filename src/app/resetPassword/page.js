@@ -53,7 +53,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center bg-primary" style={{ minHeight: "86vh" }}>
+    <div className="flex flex-col items-center justify-center bg-white" style={{ minHeight: "86vh" }}>
       <div className="flex flex-col items-center">
         <p className="text-lg text-black mb-4">Reset Password</p>
         <input
@@ -67,7 +67,7 @@ export default function ResetPassword() {
         {success && <p className="text-green mb-4">{success}</p>}
         <button
           onClick={handleResetPassword}
-          className="px-6 py-3 bg-secondary text-white text-lg rounded-lg transition hover:ring-2 hover:ring-offset-2 hover:ring-secondary"
+          className="px-6 py-3 bg-blue-200 text-white text-lg rounded-lg transition hover:ring-2 hover:ring-offset-2 hover:ring-secondary"
         >
           Reset Password
         </button>

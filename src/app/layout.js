@@ -3,8 +3,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { useEffect, useState } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from "../lib/supabaseClient";
+import LoadingScreen from "./study/loadingScreen";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +23,10 @@ export default function RootLayout({ children }) {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const subject = searchParams.get('subject');
 
   useEffect(() => {
     console.log("Fetching user data...");
@@ -113,6 +117,17 @@ export default function RootLayout({ children }) {
     }
   };
 
+  const toggleMenu = () => {
+    setMenuOpen(!menuOpen);
+  };
+
+  const handleMenuClick = (option) => {
+    console.log(`Selected option: ${option}`);
+    setMenuOpen(false);
+    router.push(`/${option}`);
+    // Add navigation or action logic here based on the selected option
+  };
+
   console.log("Rendering layout. isLoggedIn:", isLoggedIn);
 
   return (
@@ -122,11 +137,27 @@ export default function RootLayout({ children }) {
       >
         {/* Render the loading state inside the body */}
         {isLoading ? (
-          <div>Loading...</div> // Or a loading spinner
+          <LoadingScreen />
         ) : (
           <>
             {/* Render the banner */}
-            <div className="bg-primary text-black w-full py-6 fixed top-0 left-0 border-b border-gray flex items-center justify-center">
+            <div className="bg-white text-black w-full py-6 fixed top-0 left-0 border-b border-gray flex items-center justify-center">
+              {/* Left content */}
+              <div className="absolute left-16">
+                {subject ? (
+                  <span className="text-xl font-bold">📚 {subject}</span>
+                ) : (
+                  <div className="relative">
+                    <button
+                      className="text-3xl font-bold -ml-8 focus:outline-none transition-transform transform hover:scale-110"
+                      onClick={toggleMenu}
+                    >
+                      {menuOpen ? '✕' : '☰'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Centered content */}
               <div className="flex items-center justify-center gap-12">
                 {/* Conditionally render the time span based on isLoggedIn */}
@@ -142,7 +173,7 @@ export default function RootLayout({ children }) {
 
                 {/* Conditionally render the streak span based on isLoggedIn */}
                 {isLoggedIn && (
-                  <span className="text-2xl font-bold mr-8">
+                  <span className="text-2xl font-bold mr-6">
                     🔥 {streak}
                   </span>
                 )}
@@ -150,13 +181,39 @@ export default function RootLayout({ children }) {
 
               {/* Conditionally render the username based on isLoggedIn */}
               {isLoggedIn && (
-                <span className="text-2xl font-bold absolute right-16">
+                <span className="text-xl font-bold absolute right-16">
                   👤 {username}
                 </span>
               )}
             </div>
 
-            <div className="mt-24">
+            {/* Horizontal dropdown menu */}
+            {menuOpen && (
+              <div className="fixed top-24 left-0 w-full bg-white border-b border-gray-300 shadow-lg">
+                <ol className="flex w-full text-black">
+                  <li
+                    className="flex-1 text-lg font-semibold hover:text-blue-600 cursor-pointer transition-colors duration-200 text-center py-4"
+                    onClick={() => handleMenuClick('selectConfidence')}
+                  >
+                    Update Confidence Levels
+                  </li>
+                  <li
+                    className="flex-1 text-lg font-semibold hover:text-blue-600 cursor-pointer transition-colors duration-200 text-center py-4"
+                    onClick={() => handleMenuClick('profileSettings')}
+                  >
+                    Profile Settings
+                  </li>
+                  <li
+                    className="flex-1 text-lg font-semibold hover:text-blue-600 cursor-pointer transition-colors duration-200 text-center py-4"
+                    onClick={() => handleMenuClick('View Flashcards')}
+                  >
+                    View Flashcards
+                  </li>
+                </ol>
+              </div>
+            )}
+
+            <div className="mt-0">
               {children}
             </div>
           </>
