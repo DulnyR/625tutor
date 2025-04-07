@@ -26,7 +26,11 @@ export default function RootLayout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const subject = searchParams.get('subject');
+  let subject = searchParams.get('subject');
+
+  if (subject && subject.includes('Design')) {
+    subject = 'Design & Communication Graphics';
+  }
 
   useEffect(() => {
     console.log("Fetching user data...");

@@ -1,5 +1,4 @@
 import React from 'react';
-import '../globals.css'; // Import the CSS file for the animation
 
 const LoadingScreen = () => {
     return (

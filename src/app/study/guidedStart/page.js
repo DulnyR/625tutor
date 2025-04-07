@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import '../../globals.css';
 import LoadingScreen from '../loadingScreen';
 
 const GuidedStartPage = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const subject = searchParams.get('subject');
+    let subject = searchParams.get('subject');
     const [loading, setLoading] = useState(true);
+
+    if (subject && subject.includes('Design')) {
+        subject = 'Design & Communication Graphics';
+    }
 
     useEffect(() => {
         // Simulate data fetching or processing

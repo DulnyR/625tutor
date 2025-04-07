@@ -9,10 +9,14 @@ const ExamRedirectPage = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const overallTime = searchParams.get('overallTime');
-    const subject = searchParams.get('subject');
+    let subject = searchParams.get('subject');
     const level = searchParams.get('level');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null); // Add this line
+    const [error, setError] = useState(null);
+
+    if (subject && subject.includes('Design')) {
+        subject = 'Design & Communication Graphics';
+    }
 
     useEffect(() => {
         const fetchChosenExam = async () => {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useSearchParams } from 'next/navigation';
-import '../../globals.css';
 
 const SessionCompletedPage = () => {
     const searchParams = useSearchParams();

@@ -2,16 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import '../../globals.css';
 import { supabase } from '../../../lib/supabaseClient';
 import LoadingScreen from '../loadingScreen';
 
 const ExamPaperStartPage = () => {
     const searchParams = useSearchParams();
-    const subject = searchParams.get('subject');
+    let subject = searchParams.get('subject');
     const [flashcardsCount, setFlashcardsCount] = useState(0);
     const [chosenExam, setChosenExam] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    if (subject && subject.includes('Design')) {
+        subject = 'Design & Communication Graphics';
+    }
 
     useEffect(() => {
         const fetchFlashcardsCount = async () => {

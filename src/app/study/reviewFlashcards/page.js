@@ -3,16 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
-import '../../globals.css';
 import LoadingScreen from '../loadingScreen';
 
 const ReviewFlashcards = () => {
     const searchParams = useSearchParams();
-    const subject = searchParams.get('subject');
+    let subject = searchParams.get('subject');
     const [flashcards, setFlashcards] = useState([]);
     const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
     const [showAnswer, setShowAnswer] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    if (subject && subject.includes('Design')) {
+        subject = 'Design & Communication Graphics';
+    }
 
     useEffect(() => {
         fetchDueFlashcards();

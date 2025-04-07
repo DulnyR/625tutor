@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import '../globals.css';
 
 const ProfileSettingsPage = () => {
   const router = useRouter();

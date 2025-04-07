@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import '../globals.css';
 import LoadingScreen from '../study/loadingScreen';
 
 const Dashboard = () => {

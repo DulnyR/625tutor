@@ -3,19 +3,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
-import '../../globals.css';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 import LoadingScreen from '../loadingScreen';
 
+import { findTextInPDF } from '../examQuestion/page';
+
 const MarkingScheme = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const subject = searchParams.get('subject');
+    let subject = searchParams.get('subject');
     const level = searchParams.get('level') === 'higher';
     const year = searchParams.get('year');
     const question = searchParams.get('question');
     const paper = searchParams.get('paper');
+
+    if (subject && subject.includes('Design')) {
+        subject = 'Design & Communication Graphics';
+    }
 
     const [pdfUrl, setPdfUrl] = useState('');
     const [error, setError] = useState(null);
@@ -95,9 +100,6 @@ const MarkingScheme = () => {
             // Load the PDF document
             const loadingTask = pdfjsLib.getDocument(pdfUrl);
             const pdf = await loadingTask.promise;
-
-            let startPage = null;
-            let endPage = null;
             let searchText = question;
             let nextQuestionText = `Blank Page`;
 
@@ -135,16 +137,22 @@ const MarkingScheme = () => {
 
             switch (subject) {
                 case "Mathematics":
-                    searchText = `Q${parseInt(question.match(/\d+/)[0])}`;
-                    nextQuestionText = `Q${parseInt(question.match(/\d+/)[0]) + 1}`;
+                    if (year > 2015) {
+                        searchText = `Q${parseInt(question.match(/\d+/)[0])}`;
+                        nextQuestionText = `Q${parseInt(question.match(/\d+/)[0]) + 1}`;
+                    } else {
+                        searchText = question;
+                        nextQuestionText = `Question ${parseInt(question.match(/\d+/)[0]) + 1}`;
+                    }
                     break;
                 case "English":
                     searchText = question.toUpperCase();
                     if (question.includes('Comprehending')) {
-                        nextQuestionText = 'COMPOSING';
+                        nextQuestionText = 'SECTION II – COMPOSING';
                     } else if (question.includes('The Single Text')) {
                         nextQuestionText = 'THE COMPARATIVE STUDY';
                     } else if (question.includes('The Comparative Study')) {
+                        searchText = 'SECTION II – THE COMPARATIVE STUDY';
                         nextQuestionText = 'UNSEEN POEM';
                     } else if (question.includes('Poetry')) {
                         searchText = 'UNSEEN POEM';
@@ -152,20 +160,62 @@ const MarkingScheme = () => {
                     }
                     break;
                 case "Physics":
-                    startRange = 6;
+                    if (question.includes('Section A')) {
+                        searchText = 'Tick';
+                    } else if (question.includes('Section B')) {
+                        searchText = '( h )';
+                    }
+                    startRange = 4;
                     break;
                 case "Irish":
                     if (question.includes('An Chluastuiscint')) {
                         nextQuestionText = 'Cheapadóireacht';
                     } else if (question.includes('An Cheapadóireacht')) {
-                        nextQuestionText = 'míleamh';
+                        nextQuestionText = 'Míléamh';
                     } else if (question.includes('Léamhthuiscint')) {
                         nextQuestionText = 'Prós';
                     } else if (question.includes('Prós')) {
                         nextQuestionText = 'Filíocht';
                     } else if (question.includes('Filíocht')) {
-                        nextQuestionText = 'SMM';
+                        nextQuestionText = 'Scéim Mharcála Mhodhnaithe';
                     }
+                    break;
+                case "Polish":
+                    if (question.includes('Pytanie 1')) {
+                        searchText = 'Question 1';
+                        nextQuestionText = 'Question 2';
+                    } else if (question.includes('Pytanie 2')) {
+                        searchText = 'Question 2';
+                        nextQuestionText = 'SECTION B';
+                    } else if (question.includes('Pytanie 3') || question.includes('Pytanie 4') ||
+                        question.includes('Pytanie 5')) {
+                        searchText = 'SECTION B';
+                        nextQuestionText = 'Listening Comprehension';
+                    } else if (question.includes('Listening')) {
+                        searchText = 'Listening Comprehension';
+                        nextQuestionText = 'APPENDIX 1'
+                    }
+                    break;
+                case "Design & Communication Graphics":
+                    if (question.includes('Section A - Core')) {
+                        searchText = 'Question A';
+                    } else if (question.includes('Section B - Core')) {
+                        searchText = 'Question B';
+                    } else if (question.includes('Section C - Applied Graphics')) {
+                        searchText = 'Question C';
+                    }
+                    break;
+                case "Spanish":
+                    if (question.includes('Section A')) {
+                        nextQuestionText = 'Section B';
+                    } else if (question.includes('Section B')) {
+                        nextQuestionText = 'Section C';
+                    } else if (question.includes('Section C')) {
+                        nextQuestionText = 'Listening';
+                    } else if (question.includes('Listening')) {
+                        nextQuestionText = 'Appendix One';
+                    }
+                    break;
                 default:
                     break;
             }
@@ -174,84 +224,116 @@ const MarkingScheme = () => {
             console.log('Next question text:', nextQuestionText);
 
             // Loop through the relevant range of pages
-            for (let pageNumber = startRange; pageNumber <= endRange; pageNumber++) {
-                try {
-                    const page = await pdf.getPage(pageNumber);
+            try {
+                let startRange = 2;
+                if (subject === 'Mathematics' && Number(paper) === 2) {
+                    startRange = Math.floor(pdf.numPages / 2);
+                } 
+                let { startPage, endPage } = await findTextInPDF(pdf, searchText, [nextQuestionText], startRange);
 
-                    // Get the text content of the page
-                    const textContent = await page.getTextContent();
+                console.log('Found start page:', startPage, 'and end page:', endPage);
 
-                    // Search for the start and end points
-                    const foundStart = textContent.items.some((item) =>
-                        item.str.includes(searchText)
-                    );
-                    const foundEnd = textContent.items.some((item) =>
-                        item.str.includes(nextQuestionText)
-                    );
+                // If startPage is not found, render the entire search range
+                if (startPage === null) {
+                    console.warn(`Text "${searchText}" not found. Rendering the entire search range.`);
+                    startPage = startRange;
+                    endPage = endRange;
+                }
 
-                    if (foundStart && startPage === null) {
-                        startPage = pageNumber;
-                        console.log('Found start page:', startPage);
-                    } else if (foundEnd && endPage === null) {
-                        endPage = pageNumber - 1; // Stop rendering before the next question
-                        console.log('Found end page:', endPage);
-                        break;
+                // If endPage is not found, render until the last page of the search range
+                if (endPage === null) {
+                    endPage = endRange;
+                }
+
+                // Ensure startPage and endPage are valid
+                if (startPage < 1 || startPage > totalPages) {
+                    throw new Error(`Invalid start page: ${startPage}. Valid range is 1 to ${totalPages}.`);
+                }
+                if (endPage < 1 || endPage > totalPages) {
+                    throw new Error(`Invalid end page: ${endPage}. Valid range is 1 to ${totalPages}.`);
+                }
+
+                console.log('Rendering pages:', startPage, 'to', endPage);
+
+                // Render pages from startPage to endPage
+                for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {    
+                    try {
+                        const page = await pdf.getPage(pageNumber);
+
+                        if (subject === 'Design & Communication Graphics'){
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map((item) => item.str).join(' ');
+                            
+                            if (question.includes('Section A - Core')) {
+                                // Skip rendering pages containing specific phrases
+                                if (pageText.includes('Question B') || pageText.includes('Question C') || 
+                                    pageText.includes('Assessment Sheet')) {
+                                    console.log(`Skipping page ${pageNumber} due to excluded phrases.`);
+                                    continue;
+                                }
+                            } else if (question.includes('Section B - Core')) {
+                                // Skip rendering pages containing specific phrases
+                                if (pageText.includes('SECTION A') || pageText.includes('Question A') || 
+                                    pageText.includes('Question C') || pageText.includes('Assessment Sheet') ||
+                                    pageText.includes('QUESTION C')) {
+                                    console.log(`Skipping page ${pageNumber} due to excluded phrases.`);
+                                    continue;
+                                }
+                            } else if (question.includes('Section C - Applied Graphics')) {
+                                // Skip rendering pages containing specific phrases
+                                if (pageText.includes('SECTION A') || pageText.includes('Question B') || 
+                                    pageText.includes('Question A') || pageText.includes('Assessment Sheet')) {
+                                    console.log(`Skipping page ${pageNumber} due to excluded phrases.`);
+                                    continue;
+                                }
+                            }
+                        } 
+
+                        // Create a canvas for each page
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        pdfContainerRef.current.appendChild(canvas);
+
+                        // Set canvas dimensions
+                        const viewport = page.getViewport({ scale: 1.1 });
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        // Render the page on the canvas
+                        await page.render({
+                            canvasContext: context,
+                            viewport: viewport,
+                        }).promise;
+                    } catch (pageError) {
+                        console.error(`Error rendering page ${pageNumber}:`, pageError);
                     }
-                } catch (pageError) {
-                    console.error(`Error loading page ${pageNumber}:`, pageError);
                 }
-            }
 
-            // If startPage is not found, render the entire search range
-            if (startPage === null) {
-                console.warn(`Text "${searchText}" not found. Rendering the entire search range.`);
-                startPage = startRange;
-                endPage = endRange;
-            }
-
-            // If endPage is not found, render until the last page of the search range
-            if (endPage === null) {
-                endPage = endRange;
-            }
-
-            // Ensure startPage and endPage are valid
-            if (startPage < 1 || startPage > totalPages) {
-                throw new Error(`Invalid start page: ${startPage}. Valid range is 1 to ${totalPages}.`);
-            }
-            if (endPage < 1 || endPage > totalPages) {
-                throw new Error(`Invalid end page: ${endPage}. Valid range is 1 to ${totalPages}.`);
-            }
-
-            console.log('Rendering pages:', startPage, 'to', endPage);
-
-            // Render pages from startPage to endPage
-            for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
-                try {
-                    const page = await pdf.getPage(pageNumber);
-
-                    // Create a canvas for each page
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    pdfContainerRef.current.appendChild(canvas);
-
-                    // Set canvas dimensions
-                    const viewport = page.getViewport({ scale: 1.1 });
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
-                    // Render the page on the canvas
-                    await page.render({
-                        canvasContext: context,
-                        viewport: viewport,
-                    }).promise;
-                } catch (pageError) {
-                    console.error(`Error rendering page ${pageNumber}:`, pageError);
+                // Scroll to the start of the question
+                if (startPage !== null) {
+                    pdfContainerRef.current.children[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-            }
+            } catch (error) {
+                console.error('Error loading PDF or searching text:', error);
 
-            // Scroll to the start of the question
-            if (startPage !== null) {
-                pdfContainerRef.current.children[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // If PDF loading fails, show the marking link or provide manual instructions
+                if (markingLink) {
+                    setError(
+                        <p className="text-red-500">
+                            Failed to load the PDF. Please access the marking scheme directly:{' '}
+                            <a href={markingLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+                                Open Marking Scheme
+                            </a>
+                        </p>
+                    );
+                } else {
+                    setError(
+                        <p className="text-red-500">
+                            Failed to load the PDF. Please manually open the {level ? 'Higher' : 'Ordinary'} Level{' '}
+                            {subject} Paper {paper}, Question {question}.
+                        </p>
+                    );
+                }
             }
         } catch (error) {
             console.error('Error loading PDF or searching text:', error);

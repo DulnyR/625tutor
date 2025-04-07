@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
-import '../../globals.css';
 import LoadingScreen from '../loadingScreen';
 
 const AddFlashcards = () => {
