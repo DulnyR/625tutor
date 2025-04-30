@@ -37,7 +37,7 @@ const GuidedStartPage = () => {
 
                 {/* Introduction Paragraph */}
                 <p className="text-lg text-black leading-relaxed">
-                    To get the most out of 625Tutor's Guided Study, make sure to focus on the task at hand. Pause the timer in the bottom left-hand corner of the page if you need a quick break. Don't worry if you forget—the reset button will take you back to the time you started the current task! We recommend studying in 30-minute sessions, so feel free to take a longer break when your timer passes the goal. If you stick to this method most days, your results will be better than ever.
+                    To get the most out of 625Tutor's Guided Study, make sure to focus on the task at hand. Pause the timer in the bottom left-hand corner of the page if you need a quick break. Don't worry if you forget—the reset button will take you back to the time you started the current task! We recommend studying in 30-minute sessions, so feel free to take a longer break when your timer passes the goal. If you stick to this method most days, your results will be better than ever. If you have any questions about the current topic, feel free to ask our AI Helper below.
                 </p>
 
                 {/* Flashcard Instructions */}

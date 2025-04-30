@@ -25,7 +25,7 @@ const ProfileSettingsPage = () => {
     if (userError || !user) {
       console.log('User not authenticated. Redirecting to sign-in page.');
       setIsLoading(false);
-      router.push("/");
+      router.push("/loginPage");
       return;
     }
 

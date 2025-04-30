@@ -17,6 +17,7 @@ const SelectSubjects = () => {
     useEffect(() => {
         window.scrollTo(0, 0);
         fetchSubjects();
+        fetchUserData(); // Fetch existing user data
     }, []);
 
     const fetchSubjects = async () => {
@@ -30,6 +31,53 @@ const SelectSubjects = () => {
             setError('Error fetching subjects. Please try again.');
         } else {
             setSubjects(data);
+        }
+    };
+
+    const fetchUserData = async () => {
+        // Check if user is authenticated
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+            setError('User not authenticated. Please log in.');
+            return;
+        }
+
+        const supabaseUserId = user.id;
+
+        // Fetch the user from the users table using the Supabase user ID
+        const { data: userData, error: userFetchError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('supabase_user_id', supabaseUserId)
+            .single();
+
+        if (userFetchError || !userData) {
+            setError('User not found in the users table.');
+            return;
+        }
+
+        const userId = userData.id;
+
+        // Fetch existing user study data
+        const { data: studyData, error: studyDataError } = await supabase
+            .from('user_study_data')
+            .select('subject, higher_level')
+            .eq('user_id', userId);
+
+        if (studyDataError) {
+            console.error('Error fetching user study data:', studyDataError);
+            setError('Error fetching user study data. Please try again.');
+            return;
+        }
+
+        // Pre-fill the dropdowns with the fetched data
+        if (studyData && studyData.length > 0) {
+            const subjects = studyData.map(item => item.subject);
+            const levels = studyData.map(item => (item.higher_level ? 'Higher' : 'Ordinary'));
+
+            setSelectedSubjects(subjects);
+            setSelectedLevels(levels);
+            setDropdowns(subjects.length); // Adjust the number of dropdowns
         }
     };
 
@@ -92,67 +140,97 @@ const SelectSubjects = () => {
 
         const userId = userData.id;
 
-        // Prepare data for insertion into user_study_data table
-        const subjectData = selectedSubjects.map((subjectName, index) => ({
-            user_id: userId,
+        // Fetch existing user study data
+        const { data: existingData, error: fetchError } = await supabase
+            .from('user_study_data')
+            .select('id, subject, higher_level')
+            .eq('user_id', userId);
+
+        if (fetchError) {
+            console.error('Error fetching existing user study data:', fetchError);
+            setError('Error fetching existing user study data. Please try again.');
+            return;
+        }
+
+        // Prepare data for comparison
+        const newData = selectedSubjects.map((subjectName, index) => ({
             subject: subjectName,
-            higher_level: selectedLevels[index] === 'Higher'
+            higher_level: selectedLevels[index] === 'Higher',
         }));
 
-        console.log('Data to be inserted:', subjectData);
+        const toInsert = [];
+        const toUpdate = [];
+        const toDelete = [];
 
-        // Insert data into user_study_data table
-        const { data, error: insertError } = await supabase
-            .from('user_study_data')
-            .insert(subjectData);
+        // Determine which records to insert, update, or delete
+        existingData.forEach((record) => {
+            const match = newData.find((item) => item.subject === record.subject);
 
-        if (insertError) {
-            console.error('Full error object:', insertError);
-            console.error('Error message:', insertError.message);
-            console.error('Error details:', insertError.details);
-            console.error('Error code:', insertError.code);
-            setError(`Error inserting user study data: ${insertError.message || JSON.stringify(insertError)}`);
-            return;
-        }
-
-        console.log('Data inserted successfully:', data);
-
-        // Prepare data for insertion into user_exam_study table
-        const examDataPromises = selectedSubjects.map(async (subjectName) => {
-            const { data: examData, error: examFetchError } = await supabase
-                .from('exams')
-                .select('id')
-                .eq('subject', subjectName);
-
-            if (examFetchError) {
-                console.error('Error fetching exam data:', examFetchError);
-                return [];
+            if (!match) {
+                // Subject no longer exists in the new data, mark for deletion
+                toDelete.push(record.id);
+            } else if (match.higher_level !== record.higher_level) {
+                // Subject exists but level has changed, mark for update
+                toUpdate.push({ id: record.id, higher_level: match.higher_level });
             }
-
-            return examData.map(exam => ({
-                user_id: userId,
-                exam_id: exam.id
-            }));
         });
 
-        const examDataResults = await Promise.all(examDataPromises);
-        const examData = examDataResults.flat();
+        newData.forEach((item) => {
+            const match = existingData.find((record) => record.subject === item.subject);
 
-        console.log('Exam data to be inserted:', examData);
+            if (!match) {
+                // Subject is new, mark for insertion
+                toInsert.push({ user_id: userId, ...item });
+            }
+        });
 
-        // Insert data into user_exam_study table
-        const { error: examInsertError } = await supabase
-            .from('user_exam_study')
-            .insert(examData);
+        // Perform database operations
+        if (toDelete.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('user_study_data')
+                .delete()
+                .in('id', toDelete);
 
-        if (examInsertError) {
-            console.error('Error inserting user exam study data:', examInsertError);
-            setError(`Error inserting user exam study data: ${examInsertError.message || JSON.stringify(examInsertError)}`);
-            return;
+            if (deleteError) {
+                console.error('Error deleting user study data:', deleteError);
+                setError(`Error deleting user study data: ${deleteError.message || JSON.stringify(deleteError)}`);
+                return;
+            }
         }
 
-        console.log('Exam data inserted successfully');
+        if (toUpdate.length > 0) {
+            const updatePromises = toUpdate.map((item) =>
+                supabase
+                    .from('user_study_data')
+                    .update({ higher_level: item.higher_level })
+                    .eq('id', item.id)
+            );
 
+            const updateResults = await Promise.all(updatePromises);
+            const updateErrors = updateResults.filter((result) => result.error);
+
+            if (updateErrors.length > 0) {
+                console.error('Error updating user study data:', updateErrors);
+                setError('Error updating user study data. Please try again.');
+                return;
+            }
+        }
+
+        if (toInsert.length > 0) {
+            const { error: insertError } = await supabase
+                .from('user_study_data')
+                .insert(toInsert);
+
+            if (insertError) {
+                console.error('Error inserting user study data:', insertError);
+                setError(`Error inserting user study data: ${insertError.message || JSON.stringify(insertError)}`);
+                return;
+            }
+        }
+
+        console.log('Data synchronized successfully.');
+
+        // Redirect to the next page
         router.push(`/selectConfidence`);
     };
 
@@ -160,7 +238,7 @@ const SelectSubjects = () => {
         <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center justify-center p-8">
             <div className="max-w-3xl w-full bg-white rounded-lg shadow-xl p-8 space-y-6 mt-24">
                 <h1 className="text-4xl font-bold text-center text-black mb-4">Select Your Leaving Cert Subjects</h1>
-                <p className="text-lg text-black leading-relaxed mb-6">We recommend only adding the subjects you are planning to use for points</p>
+                <p className="text-lg text-black text-center leading-relaxed mb-6">We recommend only adding the subjects you are planning to use for points</p>
                 <div className="w-full max-w-2xl mx-auto">
                     <form className="space-y-4">
                         {Array.from({ length: dropdowns }).map((_, index) => (

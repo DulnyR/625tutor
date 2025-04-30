@@ -191,7 +191,7 @@ const AddFlashcards = () => {
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black items-center pb-40 mt-16">
+        <div className="flex flex-col min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black items-center pb-40 mt-24" style={{ minHeight: 'calc(100vh - 6rem)' }}>
             <div className={`flex w-full max-w-6xl pt-20 ${showTips ? '' : 'justify-center'}`}>
                 {/* Tips Box */}
                 {showTips && (

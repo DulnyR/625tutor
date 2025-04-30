@@ -21,6 +21,28 @@ const ReviewFlashcards = () => {
         fetchDueFlashcards();
     }, [subject]);
 
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const keyToRating = {
+                '1': 0, // Again
+                '2': 1, // Hard
+                '3': 3, // Good
+                '4': 4, // Easy
+                '5': 5, // Very Easy
+            };
+    
+            if (keyToRating.hasOwnProperty(e.key)) {
+                e.preventDefault(); // Prevent default browser behavior
+                handleRating(keyToRating[e.key]);
+            }
+        };
+    
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [handleRating]);
+
     const fetchDueFlashcards = async () => {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
@@ -167,7 +189,7 @@ const ReviewFlashcards = () => {
         <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
             <div className="w-full max-w-4xl px-4">
                 <div className="flashcard-stack">
-                    {flashcards.slice(currentFlashcardIndex).map((flashcard, index) => (
+                    {flashcards.slice(currentFlashcardIndex, currentFlashcardIndex + 50).map((flashcard, index) => (
                         <div
                             key={flashcard.id}
                             className={`flashcard ${index === 0 ? 'current' : ''}`}
@@ -177,7 +199,7 @@ const ReviewFlashcards = () => {
                                 {/* Delete button at the top-right */}
                                 <button
                                     onClick={() => handleRemoveFlashcard(flashcard.id)}
-                                    className="absolute top-2 right-2 text-red-500 mt-2 mr-2                                    npm install @fortawesome/fontawesome-svg-core @fortawesome/free-solid-svg-icons @fortawesome/react-fontawesome hover:text-red-700 text-lg"
+                                    className="absolute top-2 right-2 text-red-500 mt-2 mr-2 hover:text-red-700 text-lg"
                                 >
                                     Remove
                                 </button>
@@ -199,6 +221,12 @@ const ReviewFlashcards = () => {
                                     {!showAnswer && index === 0 ? (
                                         <button
                                             onClick={handleShowAnswer}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleShowAnswer();
+                                                }
+                                            }}
                                             className="bg-blue-500 text-white p-2 rounded w-full"
                                         >
                                             Show Answer
@@ -207,11 +235,11 @@ const ReviewFlashcards = () => {
                                         index === 0 && (
                                             <div className="flex justify-center space-x-2">
                                                 {[
-                                                    { label: 'Again', value: 0 },
-                                                    { label: 'Hard', value: 1 },
-                                                    { label: 'Good', value: 3 },
-                                                    { label: 'Easy', value: 4 },
-                                                    { label: 'Very Easy', value: 5 },
+                                                    { label: 'Again (1)', value: 0 },
+                                                    { label: 'Hard (2)', value: 1 },
+                                                    { label: 'Good (3)', value: 3 },
+                                                    { label: 'Easy (4)', value: 4 },
+                                                    { label: 'Very Easy (5)', value: 5 },
                                                 ].map((rating) => (
                                                     <button
                                                         key={rating.value}

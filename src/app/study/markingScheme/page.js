@@ -61,13 +61,10 @@ const MarkingScheme = () => {
 
             // Remove only the paper number (e.g., "1_") from the file name
             const markingSchemeFileName = pdfLinks[0].file_name.replace(/^(.*?_\d{4})_(\d+)_/, '$1_');
-            console.log('Modified file name:', markingSchemeFileName); // Debugging
 
             const { data: publicUrl } = supabase.storage
                 .from('marking_bucket') // Replace with your bucket name
                 .getPublicUrl(markingSchemeFileName);
-
-            console.log('Generated PDF URL:', publicUrl.publicUrl); // Debugging
 
             setPdfUrl(publicUrl.publicUrl);
 
@@ -131,13 +128,12 @@ const MarkingScheme = () => {
             } else if (Number(paper) === 2) {
                 // Search the second half of the document
                 startRange = cutoffPage;
-            } else {
-                throw new Error('Invalid paper number. Expected 1 or 2.');
-            }
+            } 
 
             switch (subject) {
                 case "Mathematics":
-                    if (year > 2015) {
+                case "Engineering":
+                    if (year > 2015 && subject === "Mathematics") {
                         searchText = `Q${parseInt(question.match(/\d+/)[0])}`;
                         nextQuestionText = `Q${parseInt(question.match(/\d+/)[0]) + 1}`;
                     } else {
@@ -149,13 +145,16 @@ const MarkingScheme = () => {
                     searchText = question.toUpperCase();
                     if (question.includes('Comprehending')) {
                         nextQuestionText = 'SECTION II – COMPOSING';
+                    } else if (question.includes('Composing')) {
+                        searchText = 'SECTION II – COMPOSING';
+                        nextQuestionText = 'Paper 2';
                     } else if (question.includes('The Single Text')) {
-                        nextQuestionText = 'THE COMPARATIVE STUDY';
+                        nextQuestionText = 'SECTION II – THE COMPARATIVE STUDY';
                     } else if (question.includes('The Comparative Study')) {
                         searchText = 'SECTION II – THE COMPARATIVE STUDY';
                         nextQuestionText = 'UNSEEN POEM';
                     } else if (question.includes('Poetry')) {
-                        searchText = 'UNSEEN POEM';
+                        searchText = 'Poetry (';
                         nextQuestionText = 'Appendix 1';
                     }
                     break;
@@ -213,15 +212,17 @@ const MarkingScheme = () => {
                     } else if (question.includes('Section C')) {
                         nextQuestionText = 'Listening';
                     } else if (question.includes('Listening')) {
-                        nextQuestionText = 'Appendix One';
+                        searchText = 'Anuncio';
+                        if (year > 2021) {
+                            nextQuestionText = 'Appendix One';
+                        } else {
+                            nextQuestionText = 'Prescribed Literature';
+                        }
                     }
                     break;
                 default:
                     break;
             }
-
-            console.log('Searching for text:', searchText);
-            console.log('Next question text:', nextQuestionText);
 
             // Loop through the relevant range of pages
             try {
@@ -230,8 +231,6 @@ const MarkingScheme = () => {
                     startRange = Math.floor(pdf.numPages / 2);
                 } 
                 let { startPage, endPage } = await findTextInPDF(pdf, searchText, [nextQuestionText], startRange);
-
-                console.log('Found start page:', startPage, 'and end page:', endPage);
 
                 // If startPage is not found, render the entire search range
                 if (startPage === null) {
@@ -252,8 +251,6 @@ const MarkingScheme = () => {
                 if (endPage < 1 || endPage > totalPages) {
                     throw new Error(`Invalid end page: ${endPage}. Valid range is 1 to ${totalPages}.`);
                 }
-
-                console.log('Rendering pages:', startPage, 'to', endPage);
 
                 // Render pages from startPage to endPage
                 for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {    

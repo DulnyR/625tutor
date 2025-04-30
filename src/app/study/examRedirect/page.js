@@ -21,14 +21,14 @@ const ExamRedirectPage = () => {
     useEffect(() => {
         const fetchChosenExam = async () => {
             const url = window.location.href;
-            
+
             try {
                 console.log('Fetching exams for subject:', subject);
 
                 // Fetch exams for the subject
                 const { data: exams, error: examsError } = await supabase
                     .from('exams')
-                    .select('id, exam, weight')
+                    .select('id, exam, weight, paper')
                     .eq('subject', subject);
 
                 if (examsError) {
@@ -88,28 +88,27 @@ const ExamRedirectPage = () => {
 
                 console.log('Exam scores calculated:', examScores);
 
-                if (examScores.length === 0) {
-                    throw new Error('No exams found for the subject after filtering.');
-                }
+                var chosenExam = exams[Math.floor(Math.random() * exams.length)];
 
-                const chosenExam = examScores.reduce((min, current) => current.score < min.score ? current : min, examScores[0]);
+                if (examScores.length === 0) {
+                    console.log('No exams found for the subject after filtering.');
+                } else {
+                    var chosenExam = examScores.reduce((min, current) => current.score < min.score ? current : min, examScores[0]);
+                }
 
                 console.log('Chosen exam:', chosenExam);
 
-                var paper = chosenExam.exam.split(' ')[0];
+                // Get the paper that corresponds to the chosen exam and subject
+                const paper = chosenExam.paper;
+                const exam = chosenExam.exam;
 
-                if (chosenExam.exam.split(' ').length == 2) {
-                    // Extract paper number from exam
-                    const paperFromUrl = searchParams.get('paper');
-                    paper = paperFromUrl ? Number(paperFromUrl) : Number(chosenExam.exam.split(' ')[1]);
-                    console.log('Paper number to use:', paper);
-                }
+                console.log('Chosen paper:', paper);
 
                 // Log query parameters
                 console.log('Fetching questions with:', {
                     subject: subject,
                     paper: paper,
-                    higher_level: level
+                    higher_level: level === "higher"
                 });
 
                 // Fetch a random question from the questions table
@@ -127,11 +126,11 @@ const ExamRedirectPage = () => {
                 if (questionsError || !questions || questions.length === 0) {
                     console.log('Error fetching questions:', questionsError);
                     if (url.includes('type')) {
-                        router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${paper}`);
+                        router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
                     } else if (url.includes('paper')) {
-                        router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${paper}`);
+                        router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
                     } else {
-                        router.push(`/study/examPaperStart?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${paper}`);
+                        router.push(`/study/examPaperStart?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
                     }
                     return;
                 }
@@ -183,11 +182,11 @@ const ExamRedirectPage = () => {
                 console.log(`url: ${url}`);
 
                 if (url.includes('type')) {
-                    router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}&type=exam`);
+                    router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}&type=exam`);
                 } else if (url.includes('paper')) {
-                    router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}`);
+                    router.push(`/study/examQuestion?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}`);
                 } else {
-                    router.push(`/study/examPaperStart?overallTime=${overallTime}&subject=${subject}&level=${level}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}`);
+                    router.push(`/study/examPaperStart?overallTime=${overallTime}&subject=${subject}&level=${level}&exam=${exam}&paper=${chosenQuestion.paper}&question=${chosenQuestion.question}&year=${chosenQuestion.year}`);
                 }
             } catch (error) {
                 console.error('Error fetching exam question:', error);

@@ -6,6 +6,8 @@ import { supabase } from '../../../lib/supabaseClient';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 import LoadingScreen from '../loadingScreen';
+import next from 'next';
+import jsPDF from 'jspdf';
 
 export async function findTextInPDF(pdf, searchText, endTextOptions, startRange = 2) {
   let startPage = null;
@@ -14,7 +16,7 @@ export async function findTextInPDF(pdf, searchText, endTextOptions, startRange 
   // More flexible normalization
   const normalize = (text) => (typeof text === 'string' ? text.toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim() : '');
   const normalizedSearch = normalize(searchText);
-  
+
   // More flexible end text matching
   const normalizedEndTexts = Array.isArray(endTextOptions)
     ? endTextOptions.map(option => normalize(option))
@@ -24,24 +26,21 @@ export async function findTextInPDF(pdf, searchText, endTextOptions, startRange 
     try {
       const page = await pdf.getPage(pageNumber);
       const textContent = await page.getTextContent();
-      
+
       // Combine all text items for more reliable searching
       const pageText = textContent.items.map(item => item.str).join(' ');
       const normalizedPageText = normalize(pageText);
 
       // Search for start text if not found yet
-      if (startPage === null && normalizedPageText.includes(normalizedSearch)) {
-        startPage = pageNumber;
-        console.log(`Found start text "${searchText}" on page ${pageNumber}`);
-      }
-
-      // Search for end text if start was found but end wasn't
-      if (startPage !== null && endPage === null) {
-        for (const endText of normalizedEndTexts) {
-          if (normalizedPageText.includes(endText)) {
-            endPage = pageNumber;
-            console.log(`Found ${endText} on page ${pageNumber}`);
-            break;
+      if (!(normalizedPageText.includes('written examination marking scheme'))) {
+        if (startPage === null && normalizedPageText.includes(normalizedSearch)) {
+          startPage = pageNumber;
+        } else if (startPage !== null && endPage === null) {
+          for (const endText of normalizedEndTexts) {
+            if (normalizedPageText.includes(endText)) {
+              endPage = pageNumber;
+              break;
+            }
           }
         }
       }
@@ -65,6 +64,7 @@ const ExamQuestion = () => {
   }
   const level = searchParams.get('level') === 'higher';
   const year = searchParams.get('year');
+  const exam = searchParams.get('exam');
   const paper = searchParams.get('paper');
   const question = searchParams.get('question');
 
@@ -89,8 +89,18 @@ const ExamQuestion = () => {
 
   const fetchExamQuestion = async () => {
     try {
+      if (exam == "Oral") {
+        setError(
+          <div className="text-center">
+            <p className="text-black">
+              Please practice for the {subject} oral exam.
+            </p>
+          </div>
+        );
+        setLoading(false);
+        return;
+      }
       // Fetch the corresponding PDF link
-      console.log('Fetching PDF link for:', subject, year, paper, level);
       const { data: pdfLinks, error: pdfLinksError } = await supabase
         .from('pdf_links')
         .select('file_name, exam_link')
@@ -103,8 +113,6 @@ const ExamQuestion = () => {
         throw new Error(`Error fetching PDF links: ${pdfLinksError.message}`);
       }
 
-      console.log('PDF links fetched:', pdfLinks);
-
       if (!pdfLinks || pdfLinks.length === 0) {
         throw new Error('No PDF link found.');
       }
@@ -114,9 +122,7 @@ const ExamQuestion = () => {
         .from('exam_bucket') // Replace with your bucket name
         .getPublicUrl(fileName);
 
-      console.log('Public URL:', publicUrl.publicUrl);
-
-      var description;
+      var description = question + ". Press Next if you have not studied this topic.";
 
       switch (subject) {
         case "English":
@@ -147,9 +153,9 @@ const ExamQuestion = () => {
           } else if (question.includes('Léamhthuiscint')) {
             description = "Part A and Part B of the Léamhthuiscint section.";
           } else if (question.includes('Prós')) {
-            description = "two parts from either A or B in the Prós section.";
+            description = "both parts from either A or B in the Prós section.";
           } else if (question.includes('Filíocht')) {
-            description = "two parts from either A or B in the Filíocht section.";
+            description = "both parts from either A or B in the Filíocht section.";
           }
           break;
         case "Polish":
@@ -169,7 +175,7 @@ const ExamQuestion = () => {
           } else if (question.includes('Section B - Core')) {
             description = "the Section B - Core questions you have covered.";
           } else if (question.includes('Section C - Applied Graphics')) {
-            description = "the Section C - Applied Graphics questions you have covered.";
+            description = "the Section C - Applied Graphics questions you have covered. This can take longer to load due to contours.";
           }
           break;
         case "Spanish":
@@ -187,7 +193,7 @@ const ExamQuestion = () => {
         paper: paper,
         higher_level: level ? 'Higher' : 'Ordinary',
         question: question,
-        description: description ? description : question,
+        description: description,
       });
 
       // Set the PDF URL to the Supabase Storage URL
@@ -237,11 +243,13 @@ const ExamQuestion = () => {
       }
 
       var searchText = searchTextInput;
-      var nextQuestionText = ['Acknowledgements', 'Blank Page', 
-                              'Do not write on this page', 'There is no examination material on this page'];
+      var nextQuestionText = ['Acknowledgements', 'Blank Page',
+        'Do not write on this page', 'There is no examination material on this page',
+        'See Loose Insert', 'This is space for extra work'];
 
       switch (subject) {
         case "Mathematics":
+        case "Engineering":
           nextQuestionText.push(`Question ${parseInt(examInfo.question.match(/\d+/)[0]) + 1}`);
           break;
         case "English":
@@ -263,7 +271,7 @@ const ExamQuestion = () => {
           break;
         case "Irish":
           if (examInfo.question.includes('An Chluastuiscint')) {
-            nextQuestionText.push('Freagair do');
+            nextQuestionText.push('An Cheapadóireacht');
           } else if (examInfo.question.includes('An Cheapadóireacht')) {
             searchText = 'Freagair do';
             nextQuestionText.push('Tosaigh gach ceist ar leathanach nua');
@@ -289,7 +297,7 @@ const ExamQuestion = () => {
             nextQuestionText.push('This Contour Map');
           } else if (examInfo.question.includes('Section B - Core')) {
             nextQuestionText.push('Section C - Applied Graphics');
-          } 
+          }
           break;
         case "Spanish":
           if (examInfo.question.includes('Section A')) {
@@ -297,18 +305,16 @@ const ExamQuestion = () => {
           } else if (examInfo.question.includes('Section B')) {
             nextQuestionText.push('Section C');
           } else if (examInfo.question.includes('Section C')) {
-            nextQuestionText.push('This is space for extra work');
+            nextQuestionText.push('Write your answer to question 5');
+          } else if (examInfo.question.includes('Listening')) {
+            searchText = 'ANUNCIO';
           }
           break;
         default:
           break;
       }
 
-      console.log('Searching for:', searchText, 'and', nextQuestionText);
-
       let { startPage, endPage } = await findTextInPDF(pdf, searchText, nextQuestionText);
-
-      console.log('Found start page:', startPage, 'and end page:', endPage);
 
       // If startPage is not found, render the entire PDF
       if (startPage === null) {
@@ -336,8 +342,6 @@ const ExamQuestion = () => {
           const modifiedPdfUrl = pdfUrl.replace(new RegExp(`${originalPaper}(?=[^${originalPaper}]*\\.pdf$)`), `${modifiedPaper}`);
           const modifiedLoadingTask = pdfjsLib.getDocument(modifiedPdfUrl);
           const modifiedPdf = await modifiedLoadingTask.promise;
-
-          console.log('Modified PDF loaded:', modifiedPdfUrl);
 
           const lastPageNumber = modifiedPdf.numPages;
           const lastPage = await modifiedPdf.getPage(lastPageNumber);
@@ -413,6 +417,25 @@ const ExamQuestion = () => {
     }
   };
 
+  const printRenderedPDF = () => {
+    const pdf = new jsPDF();
+    const canvases = pdfContainerRef.current.querySelectorAll('canvas');
+
+    canvases.forEach((canvas, index) => {
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      if (index > 0) {
+        pdf.addPage();
+      }
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    });
+
+    pdf.autoPrint(); // Trigger the print dialog
+    window.open(pdf.output('bloburl'), '_blank'); // Open the PDF in a new tab for printing
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -430,6 +453,16 @@ const ExamQuestion = () => {
             <div className="w-full h-[60vh] overflow-auto" ref={pdfContainerRef}>
               {/* PDF pages will be rendered here */}
             </div>
+            {subject === 'Design & Communication Graphics' && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={printRenderedPDF}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
+                  Print PDF
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

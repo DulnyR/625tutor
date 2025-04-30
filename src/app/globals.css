@@ -98,3 +98,27 @@ input[type="range"].range-sm::-moz-range-thumb {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+@keyframes gradient-spin {
+  0% {
+      --angle: 0deg;
+  }
+  100% {
+      --angle: 360deg;
+  }
+}
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.animate-gradient-spin {
+  animation: gradient-spin 8s linear infinite;
+}
+
+.hover\:shadow-glow:hover {
+  box-shadow: 0 0 20px rgba(237, 137, 54, 0.7), 
+              0 0 40px rgba(192, 66, 244, 0.5);
+}

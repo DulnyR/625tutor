@@ -47,7 +47,7 @@ export default function ResetPassword() {
     } else {
       setSuccess("Password reset successfully. Redirecting...");
       setTimeout(() => {
-        router.push("/");
+        router.push("/loginPage");
       }, 3000);
     }
   };
