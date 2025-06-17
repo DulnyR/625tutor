@@ -122,3 +122,12 @@ input[type="range"].range-sm::-moz-range-thumb {
   box-shadow: 0 0 20px rgba(237, 137, 54, 0.7), 
               0 0 40px rgba(192, 66, 244, 0.5);
 }
+
+.pdf-page-canvas {
+  display: block; /* Removes extra space below inline elements */
+  max-width: 100%; /* Ensures canvas doesn't overflow its container horizontally */
+  height: auto;    /* Maintains aspect ratio based on its width */
+  margin-left: auto;   /* Centers the canvas if it's narrower than container */
+  margin-right: auto;  /* Centers the canvas */
+  margin-bottom: 8px; /* Optional: add some space between pages */
+}

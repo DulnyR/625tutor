@@ -1,3 +1,4 @@
+//src/app/layout.js
 "use client";
 
 import { Geist, Geist_Mono } from "next/font/google";
@@ -5,6 +6,7 @@ import "./globals.css";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from "../lib/supabaseClient";
+import PdfWorkerSetup from "../lib/PdfWorkerSetup";
 import LoadingScreen from "./study/loadingScreen";
 
 const geistSans = Geist({
@@ -160,6 +162,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PdfWorkerSetup />
         {/* Render the loading state inside the body */}
         {isLoading ? (
           <LoadingScreen />
@@ -209,6 +212,8 @@ export default function RootLayout({ children }) {
                   onClick={() => {
                     if (!isLoggedIn) {
                       router.push("/"); // Redirect to "/" only if not logged in
+                    } else if (!window.location.pathname.includes("study")) {
+                      router.push("/dashboard");
                     }
                   }}
                 >

@@ -8,7 +8,7 @@ import LoadingScreen from '../loadingScreen';
 const ExamPaperStartPage = () => {
     const searchParams = useSearchParams();
     let subject = searchParams.get('subject');
-    const chosenExam = searchParams.get('paper');
+    const chosenExam = searchParams.get('exam');
     const [flashcardsCount, setFlashcardsCount] = useState(0);
     const [loading, setLoading] = useState(true);
 

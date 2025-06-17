@@ -1,25 +1,146 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
-import LoadingScreen from '../loadingScreen';
+import { supabase } from '../../../lib/supabaseClient'; // Ensure this path is correct
+import LoadingScreen from '../loadingScreen'; // Ensure this path is correct
 
 const ReviewFlashcards = () => {
     const searchParams = useSearchParams();
-    let subject = searchParams.get('subject');
+    let subjectParam = searchParams.get('subject'); // Renamed to avoid conflict with state/variable `subject`
     const [flashcards, setFlashcards] = useState([]);
     const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
     const [showAnswer, setShowAnswer] = useState(false);
     const [loading, setLoading] = useState(true);
-
-    if (subject && subject.includes('Design')) {
-        subject = 'Design & Communication Graphics';
-    }
+    const [subject, setSubject] = useState(''); // Use state for subject if it's derived and used in effects
 
     useEffect(() => {
+        let currentSubject = subjectParam;
+        if (currentSubject && currentSubject.includes('Design')) {
+            currentSubject = 'Design & Communication Graphics';
+        }
+        setSubject(currentSubject || ''); // Set the processed subject to state
+    }, [subjectParam]);
+
+
+    // Helper function for spaced repetition logic (can be outside component if it doesn't need component scope)
+    const updateFlashcardSRSData = (flashcard, rating) => {
+        let { ease_factor, repetitions, interval } = flashcard;
+
+        // Ensure ease_factor is a number and has a sensible default
+        ease_factor = Number(ease_factor) || 2.5;
+        repetitions = Number(repetitions) || 0;
+        interval = Number(interval) || 0;
+
+
+        if (rating >= 3) { // Correct recall
+            if (repetitions === 0) {
+                interval = 1;
+            } else if (repetitions === 1) {
+                interval = 6;
+            } else {
+                interval = Math.round(interval * ease_factor);
+            }
+            repetitions += 1;
+        } else { // Incorrect recall
+            repetitions = 0; // Reset repetitions
+            interval = 1;    // Next review in 1 day
+        }
+
+        // Adjust ease factor
+        ease_factor = ease_factor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02));
+        if (ease_factor < 1.3) {
+            ease_factor = 1.3; // Minimum ease factor
+        }
+
+        return { ease_factor, repetitions, interval };
+    };
+
+
+    const handleRating = useCallback(async (rating) => {
+        if (flashcards.length === 0 || !flashcards[currentFlashcardIndex]) {
+            console.warn("handleRating called with no flashcards or invalid index");
+            return;
+        }
+        const flashcard = flashcards[currentFlashcardIndex];
+        const { ease_factor, repetitions, interval } = updateFlashcardSRSData(flashcard, rating);
+
+        const nextReviewDate = new Date(Date.now() + interval * 24 * 60 * 60 * 1000);
+
+        const { error } = await supabase
+            .from('flashcards')
+            .update({
+                ease_factor,
+                repetitions,
+                interval,
+                last_reviewed: new Date().toISOString(),
+                next_review: nextReviewDate.toISOString(),
+            })
+            .eq('id', flashcard.id);
+
+        if (error) {
+            console.error('Error updating flashcard:', error);
+            return;
+        }
+
+        setShowAnswer(false);
+        setCurrentFlashcardIndex((prevIndex) => prevIndex + 1);
+    }, [flashcards, currentFlashcardIndex, supabase]);
+
+
+    useEffect(() => {
+        const fetchDueFlashcards = async () => {
+            if (!subject) { // Don't fetch if subject is not set yet
+                setLoading(false); // Potentially set loading to false if subject is required but missing
+                return;
+            }
+            setLoading(true); // Set loading true at the start of fetch
+
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+                console.error('User not authenticated. Please log in.');
+                setLoading(false);
+                return;
+            }
+
+            const supabaseUserId = user.id;
+
+            const { data: userData, error: userDataError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('supabase_user_id', supabaseUserId)
+                .single();
+
+            if (userDataError) {
+                console.error('Error fetching user data:', userDataError);
+                setLoading(false);
+                return;
+            }
+            if (!userData) {
+                console.error('No user data found for supabase_user_id:', supabaseUserId);
+                setLoading(false);
+                return;
+            }
+            const userId = userData.id;
+
+            const { data: dueFlashcards, error: flashcardsError } = await supabase
+                .from('flashcards')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('subject', subject)
+                .lte('next_review', new Date().toISOString())
+                .order('next_review', { ascending: true });
+
+            if (flashcardsError) {
+                console.error('Error fetching due flashcards:', flashcardsError);
+            } else {
+                setFlashcards(dueFlashcards || []);
+            }
+            setLoading(false);
+        };
+
         fetchDueFlashcards();
-    }, [subject]);
+    }, [subject, supabase]); // Runs when subject or supabase client changes
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -31,9 +152,12 @@ const ReviewFlashcards = () => {
                 '5': 5, // Very Easy
             };
     
-            if (keyToRating.hasOwnProperty(e.key)) {
-                e.preventDefault(); // Prevent default browser behavior
+            if (showAnswer && keyToRating.hasOwnProperty(e.key)) { // Only if answer is shown
+                e.preventDefault();
                 handleRating(keyToRating[e.key]);
+            } else if (!showAnswer && (e.key === 'Enter' || e.key === ' ')) { // Show answer on Enter/Space
+                e.preventDefault();
+                setShowAnswer(true);
             }
         };
     
@@ -41,79 +165,18 @@ const ReviewFlashcards = () => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [handleRating]);
+    }, [handleRating, showAnswer]); // Depends on the memoized handleRating and showAnswer state
 
-    const fetchDueFlashcards = async () => {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-            console.error('User not authenticated. Please log in.');
-            setLoading(false);
-            return;
-        }
-
-        const supabaseUserId = user.id;
-
-        const { data: userData, error: userDataError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('supabase_user_id', supabaseUserId)
-            .single();
-
-        if (userDataError) {
-            console.error('Error fetching user data:', userDataError);
-            setLoading(false);
-            return;
-        }
-
-        const userId = userData.id;
-
-        const { data: dueFlashcards, error: flashcardsError } = await supabase
-            .from('flashcards')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('subject', subject)
-            .lte('next_review', new Date().toISOString())
-            .order('next_review', { ascending: true });
-
-        if (flashcardsError) {
-            console.error('Error fetching due flashcards:', flashcardsError);
-            setLoading(false);
-            return;
-        }
-
-        setFlashcards(dueFlashcards);
-        setLoading(false);
-    };
-
-    const handleShowAnswer = () => {
+    const handleShowAnswer = useCallback(() => {
         setShowAnswer(true);
-    };
+    }, []);
 
-    const handleRating = async (rating) => {
-        const flashcard = flashcards[currentFlashcardIndex];
-        const { ease_factor, repetitions, interval } = updateFlashcard(flashcard, rating);
+    const handleRemoveFlashcard = useCallback(async (flashcardId) => {
+        // Optional: Add a confirmation dialog here
+        // if (!window.confirm("Are you sure you want to remove this flashcard?")) {
+        //     return;
+        // }
 
-        const { error } = await supabase
-            .from('flashcards')
-            .update({
-                ease_factor,
-                repetitions,
-                interval,
-                last_reviewed: new Date().toISOString(),
-                next_review: new Date(Date.now() + interval * 24 * 60 * 60 * 1000).toISOString(),
-            })
-            .eq('id', flashcard.id);
-
-        if (error) {
-            console.error('Error updating flashcard:', error);
-            return;
-        }
-
-        setShowAnswer(false);
-        setCurrentFlashcardIndex((prevIndex) => (prevIndex + 1));
-    };
-
-    const handleRemoveFlashcard = async (flashcardId) => {
         const { error } = await supabase
             .from('flashcards')
             .delete()
@@ -124,139 +187,135 @@ const ReviewFlashcards = () => {
             return;
         }
 
-        setFlashcards(flashcards.filter((flashcard) => flashcard.id !== flashcardId));
-    };
+        setFlashcards(prevFlashcards => prevFlashcards.filter((flashcard) => flashcard.id !== flashcardId));
+        // If the removed card was the current one, and it's now out of bounds,
+        // but there are still other cards, we might not need to adjust currentFlashcardIndex
+        // as the map will just render fewer items.
+        // If it was the last card being displayed from the current set,
+        // currentFlashcardIndex might become >= flashcards.length, handled by render logic.
+    }, [supabase]);
 
-    const updateFlashcard = (flashcard, rating) => {
-        let { ease_factor, repetitions, interval } = flashcard;
-
-        if (rating >= 3) {
-            if (repetitions === 0) {
-                interval = 1;
-            } else if (repetitions === 1) {
-                interval = 6;
-            } else {
-                interval = Math.round(interval * ease_factor);
-            }
-            repetitions += 1;
-        } else {
-            repetitions = 0;
-            interval = 1;
-        }
-
-        ease_factor = Math.max(1.3, ease_factor + 0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02));
-
-        return { ease_factor, repetitions, interval };
-    };
 
     if (loading) {
         return <LoadingScreen />;
     }
 
+    if (!subject) {
+         return (
+            <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+                <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
+                    <p className="text-2xl mb-4">No subject selected for review.</p>
+                </div>
+            </div>
+        );
+    }
+    
     if (flashcards.length === 0) {
         return (
             <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
-                    <p className="text-2xl mb-4">No flashcards due for review.</p>
-                    <p className="text-lg">Click <strong>Next</strong> to continue.</p>
+                    <p className="text-2xl mb-4">No flashcards due for review in {subject}.</p>
                 </div>
             </div>
         );
     }
 
-    const currentFlashcard = flashcards[currentFlashcardIndex];
-
-    if (!currentFlashcard) {
+    if (currentFlashcardIndex >= flashcards.length) {
         return (
             <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
-                    <p className="text-2xl mb-4">All flashcards reviewed.</p>
-                    <p className="text-lg">Click <strong>Next</strong> to continue.</p>
+                    <p className="text-2xl mb-4">All flashcards for {subject} reviewed for this session!</p>
+                </div>
+            </div>
+        );
+    }
+
+    // This should not happen if previous checks are correct, but as a fallback:
+    const currentFlashcard = flashcards[currentFlashcardIndex];
+    if (!currentFlashcard) {
+        console.error("Current flashcard is undefined, though checks passed.");
+        return (
+             <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+                <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
+                    <p className="text-2xl mb-4">Error loading flashcard content.</p>
                 </div>
             </div>
         );
     }
 
     const ratingColors = {
-        0: "bg-red-500", // Again
-        1: "bg-orange-500", // Hard
-        3: "bg-blue-500", // Good
-        4: "bg-green-500", // Easy
-        5: "bg-teal-500", // Very Easy
+        0: "bg-red-500 hover:bg-red-600",
+        1: "bg-orange-500 hover:bg-orange-600",
+        3: "bg-blue-500 hover:bg-blue-600",
+        4: "bg-green-500 hover:bg-green-600",
+        5: "bg-teal-500 hover:bg-teal-600",
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
-            <div className="w-full max-w-4xl px-4">
-                <div className="flashcard-stack">
-                    {flashcards.slice(currentFlashcardIndex, currentFlashcardIndex + 50).map((flashcard, index) => (
-                        <div
-                            key={flashcard.id}
-                            className={`flashcard ${index === 0 ? 'current' : ''}`}
-                            style={{ zIndex: flashcards.length - index }}
-                        >
-                            <div className="bg-white p-6 shadow-lg rounded-lg w-full text-center relative h-[350px] flex flex-col">
-                                {/* Delete button at the top-right */}
-                                <button
-                                    onClick={() => handleRemoveFlashcard(flashcard.id)}
-                                    className="absolute top-2 right-2 text-red-500 mt-2 mr-2 hover:text-red-700 text-lg"
-                                >
-                                    Remove
-                                </button>
+        <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center p-4">
+            <div className="w-full max-w-2xl"> {/* Adjusted max-width for better focus */}
+                {/* Stacking effect can be complex with many cards; showing one primary card clearly is often better */}
+                {/* Current Flashcard Display */}
+                <div className="bg-white p-6 shadow-2xl rounded-lg w-full text-center relative min-h-[350px] flex flex-col justify-between">
+                    <button
+                        onClick={() => handleRemoveFlashcard(currentFlashcard.id)}
+                        className="absolute top-3 right-3 text-gray-400 hover:text-red-600 text-sm"
+                        title="Remove this flashcard"
+                    >
+                        {/* Simple X or trash icon would be good here */}
+                        × Remove 
+                    </button>
 
-                                {/* Flashcard content (scrollable) */}
-                                <div className="flex-1 overflow-y-auto mt-4 mb-4">
-                                    <div className="text-2xl">
-                                        <strong>{flashcard.front}</strong>
-                                    </div>
-                                    {showAnswer && index === 0 && (
-                                        <div className="text-2xl mt-4">
-                                            {flashcard.back}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Buttons at the bottom */}
-                                <div className="mt-auto">
-                                    {!showAnswer && index === 0 ? (
-                                        <button
-                                            onClick={handleShowAnswer}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    handleShowAnswer();
-                                                }
-                                            }}
-                                            className="bg-blue-500 text-white p-2 rounded w-full"
-                                        >
-                                            Show Answer
-                                        </button>
-                                    ) : (
-                                        index === 0 && (
-                                            <div className="flex justify-center space-x-2">
-                                                {[
-                                                    { label: 'Again (1)', value: 0 },
-                                                    { label: 'Hard (2)', value: 1 },
-                                                    { label: 'Good (3)', value: 3 },
-                                                    { label: 'Easy (4)', value: 4 },
-                                                    { label: 'Very Easy (5)', value: 5 },
-                                                ].map((rating) => (
-                                                    <button
-                                                        key={rating.value}
-                                                        onClick={() => handleRating(rating.value)}
-                                                        className={`${ratingColors[rating.value]} text-white p-2 rounded flex-1`}
-                                                    >
-                                                        {rating.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
+                    <div className="flex-grow overflow-y-auto py-4"> {/* Scrollable content area */}
+                        <div className="text-xl md:text-2xl font-semibold mb-2">
+                           {/* Sanitize or ensure HTML is not rendered if 'front' can contain HTML */}
+                           {currentFlashcard.front}
                         </div>
-                    ))}
+                        {showAnswer && (
+                            <div className="text-lg md:text-xl mt-4 pt-4 border-t border-gray-200">
+                                {/* Sanitize or ensure HTML is not rendered if 'back' can contain HTML */}
+                                {currentFlashcard.back}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Controls */}
+                    <div className="mt-4">
+                        {!showAnswer ? (
+                            <button
+                                onClick={handleShowAnswer}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg w-full text-lg transition-colors duration-150"
+                            >
+                                Show Answer (Space/Enter)
+                            </button>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                {[
+                                    { label: 'Again', value: 0, keyHint: '1' },
+                                    { label: 'Hard', value: 1, keyHint: '2' },
+                                    { label: 'Good', value: 3, keyHint: '3' },
+                                    { label: 'Easy', value: 4, keyHint: '4' },
+                                    { label: 'V. Easy', value: 5, keyHint: '5' },
+                                ].map((ratingOpt) => (
+                                    <button
+                                        key={ratingOpt.value}
+                                        onClick={() => handleRating(ratingOpt.value)}
+                                        className={`${ratingColors[ratingOpt.value]} text-white py-3 px-2 rounded-lg font-medium text-sm md:text-base transition-transform duration-100 hover:scale-105`}
+                                        title={`Rate as ${ratingOpt.label} (Press ${ratingOpt.keyHint})`}
+                                    >
+                                        {ratingOpt.label} <span className="hidden sm:inline">({ratingOpt.keyHint})</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
+                {/* Optional: Progress indicator */}
+                {flashcards.length > 0 && (
+                    <div className="text-center text-white mt-4 text-sm">
+                        Card {Math.min(currentFlashcardIndex + 1, flashcards.length)} of {flashcards.length} for {subject}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -1,13 +1,8 @@
-const withTM = require('next-transpile-modules')(['pdfjs-dist']);
+// next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  transpilePackages: ['pdfjs-dist']
+};
 
-module.exports = withTM({
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.module.rules.push({
-        test: /pdf\.worker\.js$/,
-        use: { loader: 'worker-loader', options: { esModule: false, filename: '[name].[contenthash].js' } },
-      });
-    }
-    return config;
-  },
-});
+module.exports = nextConfig;

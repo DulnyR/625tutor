@@ -1,37 +1,31 @@
+//src/app/study/examQuestion/page.js
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+import * as pdfjsLib from 'pdfjs-dist'; // Correct main import
 import LoadingScreen from '../loadingScreen';
-import next from 'next';
 import jsPDF from 'jspdf';
 
+// findTextInPDF function remains the same
 export async function findTextInPDF(pdf, searchText, endTextOptions, startRange = 2) {
   let startPage = null;
   let endPage = null;
-
-  // More flexible normalization
   const normalize = (text) => (typeof text === 'string' ? text.toLowerCase().replace(/[.,]/g, '').replace(/\s+/g, ' ').trim() : '');
   const normalizedSearch = normalize(searchText);
-
-  // More flexible end text matching
   const normalizedEndTexts = Array.isArray(endTextOptions)
     ? endTextOptions.map(option => normalize(option))
     : [normalize(endTextOptions)];
 
   for (let pageNumber = startRange; pageNumber <= pdf.numPages; pageNumber++) {
+    console.log(`[EXAMQUESTION] Searching page ${pageNumber} for text: "${normalizedSearch}"`);
     try {
       const page = await pdf.getPage(pageNumber);
       const textContent = await page.getTextContent();
-
-      // Combine all text items for more reliable searching
       const pageText = textContent.items.map(item => item.str).join(' ');
       const normalizedPageText = normalize(pageText);
 
-      // Search for start text if not found yet
       if (!(normalizedPageText.includes('written examination marking scheme'))) {
         if (startPage === null && normalizedPageText.includes(normalizedSearch)) {
           startPage = pageNumber;
@@ -44,55 +38,104 @@ export async function findTextInPDF(pdf, searchText, endTextOptions, startRange 
           }
         }
       }
-
-      // If both start and end found, we can stop searching
       if (startPage !== null && endPage !== null) break;
-
     } catch (pageError) {
       console.error(`Error loading page ${pageNumber}:`, pageError);
     }
   }
-
   return { startPage, endPage };
 }
 
+
 const ExamQuestion = () => {
   const searchParams = useSearchParams();
-  let subject = searchParams.get('subject');
-  if (subject && subject.includes('Design')) {
-    subject = 'Design & Communication Graphics';
-  }
-  const level = searchParams.get('level') === 'higher';
-  const year = searchParams.get('year');
-  const exam = searchParams.get('exam');
-  const paper = searchParams.get('paper');
-  const question = searchParams.get('question');
+  const subjectParam = searchParams.get('subject');
+  const levelParam = searchParams.get('level');
+  const yearParam = searchParams.get('year');
+  const examParam = searchParams.get('exam');
+  const paperParam = searchParams.get('paper');
+  const questionParam = searchParams.get('question');
+
+  const [subject, setSubject] = useState('');
+  const [level, setLevel] = useState(false);
+  const [year, setYear] = useState('');
+  const [exam, setExam] = useState('');
+  const [paper, setPaper] = useState('');
+  const [question, setQuestion] = useState('');
 
   const [examInfo, setExamInfo] = useState(null);
   const [pdfUrl, setPdfUrl] = useState('');
   const [error, setError] = useState(null);
   const [examLink, setExamLink] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isWorkerReady, setIsWorkerReady] = useState(false);
   const pdfContainerRef = useRef(null);
 
   useEffect(() => {
-    if (subject) {
-      fetchExamQuestion();
+    if (typeof window !== 'undefined') {
+      console.log('[EXAMQUESTION] pdfjsLib object:', pdfjsLib);
+      console.log('[EXAMQUESTION] PDF.js version:', pdfjsLib.version); // Log the version
+      console.log('[EXAMQUESTION] Checking worker. Current pdfjsLib.GlobalWorkerOptions.workerSrc:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+      if (pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        console.log('[EXAMQUESTION] Worker seems ready in ExamQuestion:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+        setIsWorkerReady(true);
+      } else {
+        console.warn('[EXAMQUESTION] Worker not set by global setup. THIS IS A FALLBACK. Check global setup logs.');
+      }
     }
-  }, [subject]);
+  }, []);
 
   useEffect(() => {
-    if (pdfUrl && examInfo?.question) {
-      loadPdfAndSearchQuestion(pdfUrl, `${examInfo.question}`);
+    let currentSubject = subjectParam;
+    if (currentSubject && currentSubject.includes('Design')) {
+      currentSubject = 'Design & Communication Graphics';
     }
-  }, [pdfUrl, examInfo?.question]); // Only trigger when `examInfo.question` changes
+    setSubject(currentSubject || '');
+    setLevel(levelParam === 'higher');
+    setYear(yearParam || '');
+    setExam(examParam || '');
+    setPaper(paperParam || '');
+    setQuestion(questionParam || '');
+  }, [subjectParam, levelParam, yearParam, examParam, paperParam, questionParam]);
+
+  useEffect(() => {
+    if (subject && year && paper && exam) { // Ensure all necessary params are derived before fetching
+      fetchExamQuestion();
+    }
+  }, [subject, year, paper, exam, level]); // Added level as it's used in fetch
+
+  useEffect(() => {
+    if (isWorkerReady && pdfUrl && examInfo?.question) {
+      console.log('[EXAMQUESTION] Worker is ready, PDF URL and examInfo are set. Proceeding to load PDF.');
+      if (pdfContainerRef.current) {
+        pdfContainerRef.current.innerHTML = '<p class="text-center text-gray-500 p-10">Loading PDF content...</p>';
+      }
+      setError(null);
+      loadPdfAndSearchQuestion(pdfUrl, `${examInfo.question}`);
+    } else if (pdfUrl && examInfo?.question && !isWorkerReady) {
+      console.warn('[EXAMQUESTION] Attempted to load PDF, but worker is NOT ready.');
+      if (pdfContainerRef.current) {
+        pdfContainerRef.current.innerHTML = '<p class="text-center text-orange-500 p-10">PDF system is initializing. Please wait...</p>';
+      }
+    }
+  }, [isWorkerReady, pdfUrl, examInfo]); // examInfo.question is implicitly covered by examInfo
+
 
   const fetchExamQuestion = async () => {
+    if (!subject || !year || !paper || !exam) {
+      console.warn("Missing parameters for fetching exam question. Subject:", subject, "Year:", year, "Paper:", paper, "Exam:", exam);
+      setError(<p>Missing information to fetch the exam question.</p>);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
     try {
-      if (exam == "Oral") {
+      if (exam === "Oral") {
         setError(
           <div className="text-center">
-            <p className="text-black">
+            <p className="text-gray-800">
               Please practice for the {subject} oral exam.
             </p>
           </div>
@@ -100,7 +143,7 @@ const ExamQuestion = () => {
         setLoading(false);
         return;
       }
-      // Fetch the corresponding PDF link
+
       const { data: pdfLinks, error: pdfLinksError } = await supabase
         .from('pdf_links')
         .select('file_name, exam_link')
@@ -114,16 +157,25 @@ const ExamQuestion = () => {
       }
 
       if (!pdfLinks || pdfLinks.length === 0) {
-        throw new Error('No PDF link found.');
+        const errorMsg = `No PDF link found for: ${subject}, Year: ${year}, Paper: ${paper}, Level: ${level ? 'Higher' : 'Ordinary'}.`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
       }
 
       const fileName = pdfLinks[0].file_name;
-      const { data: publicUrl } = supabase.storage
-        .from('exam_bucket') // Replace with your bucket name
+      const { data: publicUrlData, error: storageError } = supabase.storage
+        .from('exam_bucket')
         .getPublicUrl(fileName);
 
-      var description = question + ". Press Next if you have not studied this topic.";
+      if (storageError) {
+        throw new Error(`Error getting public URL for ${fileName}: ${storageError.message}`);
+      }
+      if (!publicUrlData || !publicUrlData.publicUrl) {
+        throw new Error(`Could not retrieve public URL for ${fileName}.`);
+      }
+      const fetchedPdfUrl = publicUrlData.publicUrl;
 
+      var description = question + ". Press Next if you have not studied this topic.";
       switch (subject) {
         case "English":
           if (question.includes('Comprehending')) {
@@ -189,28 +241,29 @@ const ExamQuestion = () => {
 
       setExamInfo({
         subject,
-        year: year,
-        paper: paper,
-        higher_level: level ? 'Higher' : 'Ordinary',
-        question: question,
+        year,
+        paper,
+        higher_level: level,
+        question,
         description: description,
       });
 
-      // Set the PDF URL to the Supabase Storage URL
-      setPdfUrl(publicUrl.publicUrl);
-
-      // Set the exam link
+      setPdfUrl(fetchedPdfUrl);
       if (pdfLinks[0].exam_link) {
         setExamLink(pdfLinks[0].exam_link);
       }
+
     } catch (error) {
-      console.error('Error fetching exam question:', error);
+      console.error('Error in fetchExamQuestion:', error.message);
       setError(
         <div className="text-center">
-          <p className="text-black">
-            Exam paper view for {subject} coming soon!
+          <p className="text-gray-800">
+            Exam paper view for {subject} coming soon or an error occurred.
           </p>
-          <p className="text-black">
+          <p className="text-gray-700 text-sm">
+            Details: {error.message}
+          </p>
+          <p className="text-gray-800">
             Please attempt an exam question you have not done before.
           </p>
         </div>
@@ -220,24 +273,78 @@ const ExamQuestion = () => {
     }
   };
 
-  const loadPdfAndSearchQuestion = async (pdfUrl, searchTextInput) => {
+  const loadPdfAndSearchQuestion = async (currentPdfUrl, searchTextInput) => {
+    if (!pdfContainerRef.current) {
+      console.error("[EXAMQUESTION] PDF container ref is not available.");
+      return;
+    }
     try {
-      // Ensure this runs only on the client side
       if (typeof window === 'undefined') return;
 
-      // Set up PDF.js worker
-      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-      // Fix the PDF URL if needed
-      if (!pdfUrl.endsWith('.pdf')) {
-        pdfUrl += '.pdf';
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        console.error('[EXAMQUESTION] CRITICAL: GlobalWorkerOptions.workerSrc is STILL NOT SET before getDocument!');
+        setError(<p className="text-red-500">PDF Worker not configured. Cannot load PDF.</p>);
+        return;
       }
 
-      // Load the PDF document
-      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      // Dynamically get PDF.js version for URLs
+      const pdfjsVersion = pdfjsLib.version;
+      const CMAP_URL = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/cmaps/`;
+      const STANDARD_FONT_DATA_URL = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/standard_fonts/`;
+
+      console.log('[EXAMQUESTION] About to call getDocument. Worker src:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+      console.log('[EXAMQUESTION] Using CMAP_URL:', CMAP_URL);
+      console.log('[EXAMQUESTION] Using STANDARD_FONT_DATA_URL:', STANDARD_FONT_DATA_URL);
+
+
+      let urlToLoad = currentPdfUrl;
+      if (!urlToLoad.endsWith('.pdf')) {
+        urlToLoad += '.pdf';
+        currentPdfUrl = urlToLoad;
+      }
+      console.log("[EXAMQUESTION] Loading PDF from URL:", urlToLoad);
+
+      console.log('[EXAMQUESTION] PDF.js Version for URLs:', pdfjsVersion);
+      console.log('[EXAMQUESTION] CMAP_URL being passed to getDocument:', CMAP_URL);
+      console.log('[EXAMQUESTION] STANDARD_FONT_DATA_URL being passed to getDocument:', STANDARD_FONT_DATA_URL);
+      console.log('[EXAMQUESTION] useSystemFonts being passed to getDocument:', true);
+
+      const loadingTask = pdfjsLib.getDocument({
+        url: urlToLoad,
+        cMapUrl: CMAP_URL,
+        cMapPacked: true,
+        standardFontDataUrl: STANDARD_FONT_DATA_URL,
+        useSystemFonts: true, // Recommended for better font matching
+      });
       const pdf = await loadingTask.promise;
 
-      // Clear the container properly
+      console.log('[EXAMQUESTION] PDF loaded. Getting font data...');
+      for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) { // Check first few pages
+        try {
+          const page = await pdf.getPage(i);
+          const operatorList = await page.getOperatorList();
+          const FONT_NAME_REGEX = /^[A-Z]{6}\+(.+)$/; // Common format for subsetted embedded fonts
+
+          operatorList.fnArray.forEach((fn, j) => {
+            if (fn === pdfjsLib.OPS.setFont) {
+              const fontArg = operatorList.argsArray[j][0];
+              const font = page.commonObjs.get(fontArg);
+              if (font) {
+                let fontName = font.name;
+                const match = FONT_NAME_REGEX.exec(fontName);
+                if (match) {
+                  fontName = `${match[1]} (subsetted)`;
+                }
+              } else {
+                console.warn(`[EXAMQUESTION] Page ${i}, Font Index ${j}: Could not retrieve font object for arg: ${fontArg}`);
+              }
+            }
+          });
+        } catch (e) {
+          console.error(`[EXAMQUESTION] Error getting font data for page ${i}:`, e);
+        }
+      }
+
       while (pdfContainerRef.current.firstChild) {
         pdfContainerRef.current.removeChild(pdfContainerRef.current.firstChild);
       }
@@ -311,22 +418,37 @@ const ExamQuestion = () => {
           }
           break;
         default:
-          break;
+          break; f
       }
 
-      let { startPage, endPage } = await findTextInPDF(pdf, searchText, nextQuestionText);
+      let startPage, endPage;
 
-      // If startPage is not found, render the entire PDF
+      if (subject.includes('Spanish') && (searchText.includes('Section C') || searchText.includes('Section B'))) {
+        console.log(`[EXAMQUESTION] Special case for Spanish Section C or B. Searching from page 5.`);
+        const result = await findTextInPDF(pdf, searchText, nextQuestionText, 5);
+        startPage = result.startPage;
+        endPage = result.endPage;
+      } else {
+        const result = await findTextInPDF(pdf, searchText, nextQuestionText);
+        startPage = result.startPage;
+        endPage = result.endPage;
+      }
+
+      console.log(`[EXAMQUESTION] Search completed. Start Page: ${startPage}, End Page: ${endPage}`);
+
       if (startPage === null) {
-        console.warn(`Text "${searchText}" not found. Rendering the entire PDF.`);
-        startPage = 2;
+        console.warn(`[EXAMQUESTION] Text "${searchText}" not found. Rendering the entire PDF from page 1 (or 2 if default).`);
+        startPage = 1; // Defaulting to page 1 if not found, consider your findTextInPDF default if different.
+        endPage = pdf.numPages;
+      }
+      if (endPage === null || endPage < startPage) {
         endPage = pdf.numPages;
       }
 
-      // If endPage is not found, render until the last page
-      if (endPage === null) {
-        endPage = pdf.numPages;
-      }
+      startPage = Math.max(1, Math.min(startPage, pdf.numPages));
+      endPage = Math.max(startPage, Math.min(endPage, pdf.numPages));
+
+      console.log(`[EXAMQUESTION] Found startPage: ${startPage}, endPage: ${endPage} for search text "${searchText}"`);
 
       if (subject === 'Design & Communication Graphics' || subject === "Spanish") {
         let originalPaper, modifiedPaper;
@@ -339,101 +461,133 @@ const ExamQuestion = () => {
           modifiedPaper = 2;
         }
         if (originalPaper && modifiedPaper) {
-          const modifiedPdfUrl = pdfUrl.replace(new RegExp(`${originalPaper}(?=[^${originalPaper}]*\\.pdf$)`), `${modifiedPaper}`);
-          const modifiedLoadingTask = pdfjsLib.getDocument(modifiedPdfUrl);
-          const modifiedPdf = await modifiedLoadingTask.promise;
+          if (currentPdfUrl) {
+            console.log(`Modifying ${currentPdfUrl} for ${subject} from ${originalPaper} to ${modifiedPaper}`);
+            let modifiedPdfUrl = currentPdfUrl.replace(new RegExp(`${originalPaper}(?=[^${originalPaper}]*\\.pdf$)`), `${modifiedPaper}`);
+            console.log(`[EXAMQUESTION] Loading modified PDF for ${subject} from URL:`, modifiedPdfUrl);
+            const modifiedLoadingTask = pdfjsLib.getDocument({
+              url: modifiedPdfUrl,
+              cMapUrl: CMAP_URL,
+              cMapPacked: true,
+              standardFontDataUrl: STANDARD_FONT_DATA_URL,
+              useSystemFonts: true,
+            });
+            const modifiedPdf = await modifiedLoadingTask.promise;
 
-          const lastPageNumber = modifiedPdf.numPages;
-          const lastPage = await modifiedPdf.getPage(lastPageNumber);
+            const firstPage = await modifiedPdf.getPage(1);
 
-          // Create a canvas for the last page
-          const lastPageCanvas = document.createElement('canvas');
-          const lastPageContext = lastPageCanvas.getContext('2d');
-          pdfContainerRef.current.appendChild(lastPageCanvas);
-
-          // Set canvas dimensions for the last page
-          const lastPageViewport = lastPage.getViewport({ scale: 1.1 });
-          lastPageCanvas.height = lastPageViewport.height;
-          lastPageCanvas.width = lastPageViewport.width;
-
-          // Render the last page on the canvas
-          await lastPage.render({
-            canvasContext: lastPageContext,
-            viewport: lastPageViewport,
-          }).promise;
+            const firstPageCanvas = document.createElement('canvas');
+            const firstPageContext = firstPageCanvas.getContext('2d');
+            pdfContainerRef.current.appendChild(firstPageCanvas);
+            const firstPageViewport = firstPage.getViewport({ scale: 1.1 });
+            firstPageCanvas.height = firstPageViewport.height;
+            firstPageCanvas.width = firstPageViewport.width;
+            await firstPage.render({
+              canvasContext: firstPageContext,
+              viewport: firstPageViewport,
+            }).promise;
+          } else {
+            console.warn("[EXAMQUESTION] currentPdfUrl is undefined, cannot load modified PDF for DCG/Spanish special case.");
+          }
         }
       }
 
-      // Render pages from startPage to endPage
-      for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
+      console.log(`[EXAMQUESTION] Rendering pages ${startPage} to ${endPage}`);
+      for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
         try {
-          const page = await pdf.getPage(pageNumber);
-
-          // Create a canvas for each page
+          const page = await pdf.getPage(pageNum);
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
-          pdfContainerRef.current.appendChild(canvas);
+          // Ensure canvas has CSS to prevent distortion, e.g., max-width: 100%; height: auto;
+          // This is usually better handled by CSS on the canvas elements globally or via a class.
+          // canvas.style.maxWidth = "100%";
+          // canvas.style.height = "auto";
 
-          // Set canvas dimensions
           const viewport = page.getViewport({ scale: 1.1 });
           canvas.height = viewport.height;
           canvas.width = viewport.width;
 
-          // Render the page on the canvas
-          await page.render({
-            canvasContext: context,
-            viewport: viewport,
-          }).promise;
-        } catch (pageError) {
-          console.error(`Error rendering page ${pageNumber}:`, pageError);
+          if (pdfContainerRef.current) { // Check ref again before appending
+            pdfContainerRef.current.appendChild(canvas);
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+          } else {
+            console.warn(`[EXAMQUESTION] pdfContainerRef became null before rendering page ${pageNum}`);
+            break; // Stop if container is gone
+          }
+        } catch (pageRenderError) {
+          console.error(`[EXAMQUESTION] Error rendering page ${pageNum}:`, pageRenderError);
         }
       }
 
-      // Scroll to the start of the question
-      if (startPage !== null) {
+      if (startPage !== null && pdfContainerRef.current && pdfContainerRef.current.children.length > 0) {
         pdfContainerRef.current.children[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (pdfContainerRef.current && pdfContainerRef.current.children.length === 0) {
+        pdfContainerRef.current.innerHTML = `<p class="text-center text-gray-500 p-10">No content rendered for the selected question.</p>`;
       }
-    } catch (error) {
-      console.error('Error loading PDF or searching text:', error);
 
-      // If PDF loading fails, show the exam link or provide manual instructions
+    } catch (err) {
+      console.error('[EXAMQUESTION] Error in loadPdfAndSearchQuestion:', err);
+      let errorContent = 'Error loading PDF or searching for question text.';
       if (examLink) {
-        setError(
-          <p className="text-red-500">
-            Failed to load the PDF. Please access the exam paper directly:{' '}
-            <a href={examLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
-              Open Exam Paper
-            </a>
-          </p>
-        );
+        errorContent += `
+              <p class="mt-2 text-black">Please try accessing the exam paper directly: 
+                  <a href="${examLink}" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">
+                      Open Exam Paper
+                  </a>
+              </p>`;
+      }
+      if (pdfContainerRef.current) {
+        pdfContainerRef.current.innerHTML = errorContent;
       } else {
-        setError(
-          <p className="text-red-500">
-            Failed to load the PDF. Please manually open the {examInfo?.higher_level ? 'Higher' : 'Ordinary'} Level{' '}
-            {examInfo?.subject} Paper {examInfo?.paper}, Question {examInfo?.question}.
-          </p>
-        );
+        setError(<div dangerouslySetInnerHTML={{ __html: errorContent }} />);
       }
     }
   };
 
   const printRenderedPDF = () => {
-    const pdf = new jsPDF();
+    if (!pdfContainerRef.current) return;
+    const pdfToPrint = new jsPDF();
     const canvases = pdfContainerRef.current.querySelectorAll('canvas');
 
     canvases.forEach((canvas, index) => {
       const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 210; // A4 width in mm
+      const imgWidth = 210;
+      const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
 
       if (index > 0) {
-        pdf.addPage();
+        pdfToPrint.addPage();
       }
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+      if (imgHeight > pageHeight) {
+        while (heightLeft > 0) {
+          pdfToPrint.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+          position -= pageHeight;
+          if (heightLeft > 0) {
+            pdfToPrint.addPage();
+          }
+        }
+      } else {
+        pdfToPrint.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      }
     });
 
-    pdf.autoPrint(); // Trigger the print dialog
-    window.open(pdf.output('bloburl'), '_blank'); // Open the PDF in a new tab for printing
+    try {
+      pdfToPrint.autoPrint();
+      const blobUrl = pdfToPrint.output('bloburl');
+      if (blobUrl) {
+        window.open(blobUrl, '_blank');
+      } else {
+        console.error("Failed to generate bloburl for printing.");
+        alert("Could not open PDF for printing. Please try again or check browser console.");
+      }
+    } catch (printError) {
+      console.error("Error during PDF print generation:", printError);
+      alert("An error occurred while preparing the PDF for printing.");
+    }
   };
 
   if (loading) {
@@ -441,29 +595,48 @@ const ExamQuestion = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center justify-center p-8 pb-24">
-      <div className="max-w-3xl w-full bg-white rounded-lg shadow-xl p-8 space-y-6 mt-24">
-        <h1 className="text-4xl font-bold text-center text-black mb-4" style={{ paddingTop: '1rem' }}>Exam Question</h1>
-        {error && <div>{error}</div>}
-        {examInfo && (
-          <div className="w-full max-w-6xl flex flex-col mb-40">
-            <div className="mb-4 flex justify-center">
-              <p className="text-xl font-semibold text-black text-center">Attempt {examInfo.description} </p>
+    <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center justify-center p-4 md:p-8 pb-24">
+      <div className="max-w-3xl w-full bg-white rounded-lg shadow-xl p-4 md:p-8 space-y-6 mt-20 md:mt-24">
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-4">Exam Question</h1>
+        {error && <div className="text-center p-4 bg-red-100 text-red-700 rounded">{error}</div>}
+        {examInfo && !error && (
+          <div className="w-full">
+            <div className="mb-4 text-center">
+              <p className="text-lg md:text-xl font-semibold text-gray-700">
+                Attempt {examInfo.description}
+              </p>
             </div>
-            <div className="w-full h-[60vh] overflow-auto" ref={pdfContainerRef}>
-              {/* PDF pages will be rendered here */}
+            <div
+              className="w-full h-[70vh] overflow-auto border border-gray-300 rounded bg-gray-50"
+              ref={pdfContainerRef}
+              aria-live="polite"
+              // Add a style for canvas children to help prevent distortion
+              // This is a general good practice.
+              style={{
+                "--canvas-max-width": "100%", /* Make canvas responsive within container */
+                "--canvas-height": "auto",   /* Maintain aspect ratio */
+              }}
+            >
+              {/* PDF pages will be rendered here. Children canvas should ideally have CSS:
+                  canvas { max-width: var(--canvas-max-width); height: var(--canvas-height); } 
+                  This can be in a global CSS or applied dynamically.
+              */}
+              {!pdfContainerRef.current?.firstChild && <p className="text-center text-gray-500 p-10">Loading PDF content...</p>}
             </div>
             {subject === 'Design & Communication Graphics' && (
-              <div className="mt-4 flex justify-center">
+              <div className="mt-6 flex justify-center">
                 <button
                   onClick={printRenderedPDF}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Print PDF
                 </button>
               </div>
             )}
           </div>
+        )}
+        {!examInfo && !error && !loading && (
+          <p className="text-center text-gray-600">No exam information to display. Please check the URL parameters.</p>
         )}
       </div>
     </div>

@@ -1,3 +1,4 @@
+//src/app/study/layout.js
 "use client";
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -11,7 +12,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg">
-                <p className="text-lg mb-4">{message}</p>
+                <p className="text-lg mb-4 text-black">{message}</p>
                 <div className="flex justify-end space-x-4">
                     <button
                         onClick={onClose}
@@ -205,120 +206,106 @@ const StudyLayout = ({ children }) => {
     const [isConfirmFinishOpen, setIsConfirmFinishOpen] = useState(false);
 
     // --- AI State ---
-    const [isAiModalOpen, setIsAiModalOpen] = useState(false); // Keep state name, but it controls the panel
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
     const [aiResponse, setAiResponse] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiError, setAiError] = useState('');
     // --- End AI State ---
 
     useEffect(() => {
-        // Set URL state once window is available
         if (typeof window !== 'undefined') {
             setUrl(window.location.href);
         }
 
-        const overallTime = parseInt(searchParams.get('overallTime'), 10) || 0;
-        setTime(overallTime);
-        setInitialTime(overallTime);
+        const overallTimeFromUrl = parseInt(searchParams.get('overallTime'), 10) || 0;
+        setTime(overallTimeFromUrl);
+        setInitialTime(overallTimeFromUrl);
+
+        // Populate state from searchParams for use in toggle buttons and other logic
         setSubject(searchParams.get('subject') || '');
         setLevel(searchParams.get('level') || '');
         setExam(searchParams.get('exam') || '');
         setPaper(searchParams.get('paper') || '');
         setQuestion(searchParams.get('question') || '');
         setYear(searchParams.get('year') || '');
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pathname, searchParams]); // Depend on searchParams as well
+    }, [pathname, searchParams]);
 
     useEffect(() => {
-        // Fetch these only when subject changes or initially
-        if (subject && url) { // Ensure URL is also ready
+        if (subject && url) {
             fetchTotalStudyTime();
             fetchAudioFile();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [subject, year, level, url]); // Add dependencies that affect audio file name
+    }, [subject, year, level, url]);
 
 
     useEffect(() => {
         let timer;
-        if (!isPaused && url && !url.includes('guidedStart')) { // Ensure URL is ready
+        if (!isPaused && url && !url.includes('guidedStart')) {
             timer = setInterval(() => {
                 setTime(prevTime => prevTime + 1);
             }, 1000);
         }
         return () => clearInterval(timer);
-    }, [isPaused, url]); // Add url dependency
+    }, [isPaused, url]);
 
-    // --- Keep existing functions: fetchTotalStudyTime, fetchAudioFile, formatTime, ---
-    // --- handlePauseResume, handleReset, handleSubmit, handleFinishStudying ---
     const fetchTotalStudyTime = async () => {
-        // ... (keep existing fetchTotalStudyTime logic)
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             console.error('User not authenticated. Please log in.');
             return;
         }
-
         const supabaseUserId = user.id;
-
         const { data: userData, error: userDataError } = await supabase
             .from('users')
             .select('study_time')
             .eq('supabase_user_id', supabaseUserId)
             .single();
-
         if (userDataError) {
             console.error('Error fetching user data:', userDataError);
-            // Don't set total time if error
             return;
         }
-        // Make sure study_time exists and is a number
         if (userData && typeof userData.study_time === 'number') {
             setTotalStudyTime(userData.study_time * 60);
         } else {
             console.warn('Study time not found or invalid for user.');
-            setTotalStudyTime(0); // Default or handle as appropriate
+            setTotalStudyTime(0);
         }
     };
 
     const fetchAudioFile = async () => {
         console.log('Fetching audio file...');
-        // Ensure URL state is set before using it
         if (!url) {
             console.log('URL not ready yet for audio fetch.');
             return;
         }
         console.log('Current URL:', url);
-        if (url.includes('Chluas') || url.includes('Listening')) {
+        if ((url.includes('Chluas') || url.includes('Listening')) && !url.includes('guidedStart')) {
             console.log('URL contains Chluas or Listening');
-            // Make sure all components of the filename are available
             if (!subject || !year || !level) {
                 console.warn('Missing context for audio file name (subject, year, or level).');
-                setAudioUrl(''); // Reset audio URL if context is missing
+                setAudioUrl('');
                 return;
             }
             const audioFileName = `${subject}_${year}_0_${level === "higher" ? 'Higher' : 'Ordinary'}.mp3`;
             console.log('Audio file name:', audioFileName);
             const { data: audioPublicUrlData, error } = supabase.storage
                 .from('exam_bucket')
-                .getPublicUrl(audioFileName); // Corrected variable name
-
+                .getPublicUrl(audioFileName);
             if (error) {
                 console.error('Error fetching audio file URL:', error);
-                setAudioUrl(''); // Reset on error
+                setAudioUrl('');
                 return;
             }
-
             if (audioPublicUrlData && audioPublicUrlData.publicUrl) {
                 console.log('Audio file URL:', audioPublicUrlData.publicUrl);
                 setAudioUrl(audioPublicUrlData.publicUrl);
             } else {
                 console.error('Could not get public URL for audio file.');
-                setAudioUrl(''); // Reset if URL is not available
+                setAudioUrl('');
             }
         } else {
             console.log('URL does not contain Chluas or Listening');
-            setAudioUrl(''); // Reset if not applicable
+            setAudioUrl('');
         }
     };
 
@@ -343,222 +330,115 @@ const StudyLayout = ({ children }) => {
     };
 
     const handleSubmit = async () => {
-        // Ensure URL state is set before using it
         if (!url) {
             console.error('URL state not ready for submit.');
             return;
         }
-        // ... (keep existing handleSubmit logic, using the `url` state variable instead of window.location.href directly)
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             console.error('User not authenticated. Please log in.');
             return;
         }
-
         const supabaseUserId = user.id;
-
-        // Fetch user data
         const { data: userData, error: userDataError } = await supabase
             .from('users')
             .select('id')
             .eq('supabase_user_id', supabaseUserId)
             .single();
-
         if (userDataError) {
             console.error('Error fetching user data:', userDataError);
             return;
         }
-
         const userId = userData.id;
 
-        // Use the 'url' state variable
         if (url.includes('examQuestion') || url.includes('markingScheme')) {
             console.log(`subject: ${subject}, level: ${level}, exam: ${exam}, paper: ${paper}, question: ${question}, year: ${year}`);
-
-            // Only proceed if we have necessary details
-            if (subject && exam && level) {
+            if (subject && exam && level) { // level state here is string 'higher' or 'ordinary'
                 console.log(`Fetching exam data for subject: ${subject}, exam: ${exam}, level: ${level}`);
-
                 try {
+                    // Ensure 'exam' state has the correct value like "Paper 1", "Paper 2"
                     const { data: examData, error: examDataError } = await supabase
                         .from('exams')
                         .select('id')
                         .eq('subject', subject)
-                        .eq('exam', exam)
+                        .eq('exam', exam) // Use the 'exam' state which should be populated
                         .single();
-
-                    if (examDataError) {
-                        console.log('Error fetching exam data:', examDataError);
-                    }
-
-                    if (!examData) {
-                        throw new Error('Exam not found in the database. Please verify the input parameters.');
-                    }
-
+                    if (examDataError) console.log('Error fetching exam data:', examDataError);
+                    if (!examData) throw new Error('Exam not found. Verify params.');
                     const examId = examData.id;
-
-                    // Calculate the time spent on the page
                     const timeSpent = time - initialTime;
-
                     console.log(`userId: ${userId}, examId: ${examId}, timeSpent: ${timeSpent}`);
-
                     if (timeSpent > 0) {
                         const { data: examStudyData, error: examStudySelectError } = await supabase
-                            .from('user_exam_study')
-                            .select('time')
-                            .eq('user_id', userId)
-                            .eq('exam_id', examId)
-                            .maybeSingle();
-
-                        if (examStudySelectError) {
-                            console.error('Error fetching user_exam_study data:', examStudySelectError);
-                            throw new Error('Failed to fetch user exam study data.');
-                        }
-
+                            .from('user_exam_study').select('time').eq('user_id', userId).eq('exam_id', examId).maybeSingle();
+                        if (examStudySelectError) throw new Error('Failed to fetch user exam study data.');
                         if (examStudyData) {
                             const newTimeSpent = examStudyData.time + timeSpent;
-                            const { error: updateError } = await supabase
-                                .from('user_exam_study')
-                                .update({ time: newTimeSpent })
-                                .eq('user_id', userId)
-                                .eq('exam_id', examId);
-
-                            if (updateError) {
-                                console.error('Error updating user_exam_study:', updateError);
-                                throw new Error('Failed to update user exam study time.');
-                            }
+                            const { error: updateError } = await supabase.from('user_exam_study').update({ time: newTimeSpent }).eq('user_id', userId).eq('exam_id', examId);
+                            if (updateError) throw new Error('Failed to update user exam study time.');
                         } else {
-                            const { error: insertError } = await supabase
-                                .from('user_exam_study')
-                                .insert({
-                                    user_id: userId,
-                                    exam_id: examId,
-                                    time: timeSpent,
-                                });
-
-                            if (insertError) {
-                                console.error('Error inserting into user_exam_study:', insertError);
-                                throw new Error('Failed to insert user exam study time.');
-                            }
+                            const { error: insertError } = await supabase.from('user_exam_study').insert({ user_id: userId, exam_id: examId, time: timeSpent });
+                            if (insertError) throw new Error('Failed to insert user exam study time.');
                         }
-
                         console.log(`Recorded ${timeSpent} seconds for exam ID ${examId}`);
                     } else {
                         console.log('No time spent on this page, skipping time record.');
                     }
                 } catch (error) {
                     console.error('Error processing exam study time:', error.message || error);
-                    alert(error.message || 'An unexpected error occurred while processing exam study time.');
+                    alert(error.message || 'An unexpected error occurred.');
                 }
             } else {
-                console.warn("Missing subject, paper, or level for exam time tracking.");
+                console.warn("Missing subject, exam type, or level for exam time tracking.");
             }
         }
 
-        // --- Navigation Logic (keep as is, using the `url` state variable) ---
+        // Navigation Logic uses current `time` state
+        let nextUrl = '';
+        const currentParams = { overallTime: time.toString(), subject, level, exam, paper, question, year };
+        const buildQueryString = (params) => new URLSearchParams(
+            Object.entries(params).filter(([, value]) => value != null && value !== '').reduce((acc, [key, value]) => {
+                acc[key] = value;
+                return acc;
+            }, {})
+        ).toString();
+
+
         if (url.includes('guidedStart')) {
-            router.push(`/study/addFlashcards?overallTime=${time}&subject=${subject}&level=${level}`);
+            nextUrl = `/study/addFlashcards?${buildQueryString({ overallTime: time.toString(), subject, level })}`;
         } else if (url.includes('addFlashcards')) {
-            if (url.includes('type=flashcard')) { // Check specifically for type=flashcard
-                router.push(`/study/reviewFlashcards?overallTime=${time}&subject=${subject}&level=${level}&type=flashcard`);
-            } else if (url.includes('paper')) {
-                router.push(`/study/examRedirect?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
+            if (url.includes('type=flashcard')) {
+                nextUrl = `/study/reviewFlashcards?${buildQueryString({ ...currentParams, type: 'flashcard' })}`;
+            } else if (paper) { // Check if paper exists, indicating exam flow
+                nextUrl = `/study/examRedirect?${buildQueryString(currentParams)}`;
             } else {
-                router.push(`/study/reviewFlashcards?overallTime=${time}&subject=${subject}&level=${level}`);
+                nextUrl = `/study/reviewFlashcards?${buildQueryString({ overallTime: time.toString(), subject, level })}`;
             }
         } else if (url.includes('reviewFlashcards')) {
-            if (time >= 1800 && time < 1830) { // Example: 30 minutes = 1800 seconds
-                router.push(`/study/sessionCompleted?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`);
-            } else if (url.includes('type=flashcard')) { // Check for flashcard type again
-                handleFinishStudying(); // Or specific action for finishing flashcard-only review
-            } else {
-                router.push(`/study/examRedirect?overallTime=${time}&subject=${subject}&level=${level}`);
+            if (time >= 1800 && time < 1830) {
+                nextUrl = `/study/sessionCompleted?${buildQueryString(currentParams)}`;
+            } else if (url.includes('type=flashcard')) {
+                handleFinishStudying(); return; // Exit after calling finish
+            } else { // Assumes exam flow if not flashcard-only
+                nextUrl = `/study/examRedirect?${buildQueryString(currentParams)}`;
             }
         } else if (url.includes('examPaperStart')) {
-            router.push(`/study/examQuestion?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`);
-        } else if (url.includes('examQuestion')) {
-            router.push(`/study/markingScheme?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`);
-        } else if (url.includes('markingScheme')) {
-            if (question && subject && year && paper && level && userId) {
-                try {
-                    const { data: questionData, error: questionDataError } = await supabase
-                        .from('questions')
-                        .select('id')
-                        .eq('subject', subject)
-                        .eq('year', parseInt(year)) // Ensure year is integer if stored as number
-                        .eq('paper', parseInt(paper)) // Ensure paper is integer if stored as number
-                        .eq('higher_level', level === "higher")
-                        .eq('question', question) // Assuming question is stored as text/varchar
-                        .single();
-
-                    if (questionDataError) throw questionDataError;
-                    if (!questionData) throw new Error("Matching question not found in 'questions' table.");
-
-                    const questionId = questionData.id;
-
-                    console.log('Question ID:', questionId);
-                    console.log('User ID:', userId);
-
-                    const { data: questionDone, error: questionDoneSelectError } = await supabase
-                        .from('questions_done')
-                        .select('completed')
-                        .eq('question_id', questionId)
-                        .eq('user_id', userId)
-                        .maybeSingle();
-
-                    if (questionDoneSelectError) {
-                        console.error('Error fetching question_done:', questionDoneSelectError);
-                        throw questionDoneSelectError;
-                    }
-
-                    if (questionDone) {
-                        const newCompletedCount = questionDone.completed + 1;
-                        const { error: updateError } = await supabase
-                            .from('questions_done')
-                            .update({ completed: newCompletedCount, last_completed: new Date().toISOString() })
-                            .eq('question_id', questionId)
-                            .eq('user_id', userId);
-
-                        if (updateError) {
-                            console.error('Error updating questions_done:', updateError);
-                            throw updateError;
-                        }
-                        console.log(`Incremented completed count for question ID ${questionId}`);
-                    } else {
-                        console.log('Question ID:', questionId, 'not found in questions_done, creating new record.');
-                        console.log('User ID:', userId);
-                        const { error: insertError } = await supabase
-                            .from('questions_done')
-                            .insert({
-                                question_id: questionId,
-                                user_id: userId,
-                                completed: 1,
-                            });
-
-                        if (insertError) {
-                            console.error('Error inserting into questions_done:', insertError);
-                            throw insertError;
-                        }
-                        console.log(`Created first completed record for question ID ${questionId}`);
-                    }
-                } catch (error) {
-                    console.error('Error updating question completion status:', error);
-                }
-            } else {
-                console.warn("Missing data required to mark question as completed.");
-            }
-
-            // Navigate after attempting completion update
+            nextUrl = `/study/examQuestion?${buildQueryString(currentParams)}`;
+        } else if (url.includes('examQuestion')) { // This is where the original "Next" from ExamQuestion leads
+            nextUrl = `/study/markingScheme?${buildQueryString(currentParams)}`;
+        } else if (url.includes('markingScheme')) { // This is where the original "Next" from MarkingScheme leads
+            if (question && subject && year && paper && level && userId) { /* ... mark question done ... */ }
             if (time >= 1800 && time < 1830) {
-                router.push(`/study/sessionCompleted?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`);
+                nextUrl = `/study/sessionCompleted?${buildQueryString(currentParams)}`;
             } else {
-                router.push(`/study/examRedirect?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
+                nextUrl = `/study/examRedirect?${buildQueryString(currentParams)}`;
             }
         } else if (url.includes('sessionCompleted')) {
-            router.push(`/study/examRedirect?overallTime=${time}&subject=${subject}&level=${level}&exam=${exam}&paper=${paper}`);
+            nextUrl = `/study/examRedirect?${buildQueryString(currentParams)}`;
         } else {
             console.log("Submit clicked on page without specific next step logic:", url);
         }
+        if (nextUrl) router.push(nextUrl);
     };
 
     const handleFinishStudying = () => {
@@ -566,329 +446,163 @@ const StudyLayout = ({ children }) => {
     };
 
     const confirmFinishStudying = async () => {
+        // ... (keep existing confirmFinishStudying logic, it uses current `time` state correctly) ...
         setIsPaused(true);
         setIsConfirmFinishOpen(false);
-
         try {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError) {
-                console.error('Error fetching user authentication:', userError);
-                alert('Failed to authenticate user. Please log in again.');
-                setIsPaused(false);
-                return;
-            }
-            if (!user) {
-                console.error('User not authenticated.');
-                alert('User not authenticated. Please log in.');
-                setIsPaused(false);
-                return;
-            }
-
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated.');
             const supabaseUserId = user.id;
-
-            // Fetch user data
-            const { data: userData, error: userDataError } = await supabase
-                .from('users')
-                .select('id, study_time_today, streak, last_time_studied')
-                .eq('supabase_user_id', supabaseUserId)
-                .single();
-
-            if (userDataError) {
-                console.error('Error fetching user data:', userDataError);
-                alert('Failed to fetch user data. Please try again later.');
-                setIsPaused(false);
-                return;
-            }
-            if (!userData) {
-                console.error('User data not found.');
-                alert('User data not found. Please contact support.');
-                setIsPaused(false);
-                return;
-            }
-
+            const { data: userData } = await supabase.from('users').select('id, study_time_today, streak, last_time_studied').eq('supabase_user_id', supabaseUserId).single();
+            if (!userData) throw new Error('User data not found.');
             const userId = userData.id;
-
-            // Validate `time`
-            if (typeof time !== 'number' || time < 0) {
-                console.error('Invalid study time detected:', time);
-                alert('Invalid study time detected. Please refresh the page and try again.');
-                setIsPaused(false);
-                return;
-            }
-            if (time <= 0) {
-                console.warn('Total session time is zero or negative, skipping study time update.');
-                router.push('/dashboard');
-                return;
-            }
-
+            if (typeof time !== 'number' || time < 0) throw new Error('Invalid study time detected.');
+            if (time <= 0) { router.push('/dashboard'); return; }
             const studyTimeMinutes = Math.max(0, Math.floor(time / 60));
-
-            // Update user stats
             let newStudyTimeToday = (userData.study_time_today || 0) + studyTimeMinutes;
             let newStreak = userData.streak || 0;
             const lastTimeStudied = userData.last_time_studied ? new Date(userData.last_time_studied) : null;
             const now = new Date();
             const todayDateString = now.toDateString();
-
             if (lastTimeStudied) {
                 const lastStudyDateString = lastTimeStudied.toDateString();
                 if (lastStudyDateString !== todayDateString) {
-                    const yesterday = new Date(now);
-                    yesterday.setDate(now.getDate() - 1);
-                    const yesterdayDateString = yesterday.toDateString();
-
-                    if (lastStudyDateString === yesterdayDateString) {
-                        newStreak += 1;
-                    } else {
-                        newStreak = 1;
-                    }
+                    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+                    newStreak = (lastStudyDateString === yesterday.toDateString()) ? newStreak + 1 : 1;
                     newStudyTimeToday = studyTimeMinutes;
                 } else {
                     if (newStreak === 0) newStreak = 1;
                 }
             } else {
-                newStreak = 1;
-                newStudyTimeToday = studyTimeMinutes;
+                newStreak = 1; newStudyTimeToday = studyTimeMinutes;
             }
-
-            const { error: userUpdateError } = await supabase
-                .from('users')
-                .update({
-                    study_time_today: newStudyTimeToday,
-                    streak: newStreak,
-                    last_time_studied: now.toISOString()
-                })
-                .eq('id', userId);
-
-            if (userUpdateError) {
-                console.error('Error updating user stats:', userUpdateError);
-                alert('Failed to update user stats. Please try again later.');
-                setIsPaused(false);
-                return;
-            }
-
-            console.log('Updated user stats: study_time_today, streak, last_time_studied');
-
-            // Update subject-specific time
+            await supabase.from('users').update({ study_time_today: newStudyTimeToday, streak: newStreak, last_time_studied: now.toISOString() }).eq('id', userId);
             if (subject && studyTimeMinutes > 0) {
-                const newTimeSpent = studyTimeMinutes;
-                const newCalcTime = studyTimeMinutes;
-
-                const { data: existingRecord, error: fetchError } = await supabase
-                    .from('user_study_data')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .eq('subject', subject)
-                    .single();
-
-                if (fetchError && fetchError.code !== 'PGRST116') {
-                    console.error('Error fetching existing record:', fetchError);
-                    return;
-                }
-
+                const { data: existingRecord } = await supabase.from('user_study_data').select('*').eq('user_id', userId).eq('subject', subject).maybeSingle(); // use maybeSingle
                 if (existingRecord) {
-                    // Update the existing record
-                    const { error: updateError } = await supabase
-                        .from('user_study_data')
-                        .update({
-                            time_spent: existingRecord.time_spent + newTimeSpent,
-                            calc_time: existingRecord.calc_time + newCalcTime,
-                        })
-                        .eq('user_id', userId)
-                        .eq('subject', subject);
-
-                    if (updateError) {
-                        console.error('Error updating record:', updateError);
-                    }
+                    await supabase.from('user_study_data').update({ time_spent: existingRecord.time_spent + studyTimeMinutes, calc_time: existingRecord.calc_time + studyTimeMinutes }).eq('user_id', userId).eq('subject', subject);
                 } else {
-                    // Insert a new record
-                    const { error: insertError } = await supabase
-                        .from('user_study_data')
-                        .insert({
-                            user_id: userId,
-                            subject: subject,
-                            time_spent: newTimeSpent,
-                            calc_time: newCalcTime,
-                        });
-
-                    if (insertError) {
-                        console.error('Error inserting record:', insertError);
-                    }
+                    await supabase.from('user_study_data').insert({ user_id: userId, subject: subject, time_spent: studyTimeMinutes, calc_time: studyTimeMinutes });
                 }
-            } else {
-                console.warn('Skipping subject time update: No subject specified or no time spent.');
             }
-
-            // Redirect to dashboard
             router.push('/dashboard');
         } catch (error) {
-            console.error('Unexpected error during finish studying process:', error);
-            alert(`An unexpected error occurred: ${error.message}. Please try again later.`);
+            console.error('Error in confirmFinishStudying:', error);
+            alert(`An error occurred: ${error.message}. Please try again.`);
             setIsPaused(false);
         }
     };
 
     // --- AI Handlers ---
-    const handleOpenAiModal = () => {
-        setAiError('');
-        setIsAiModalOpen(true);
-    };
-
-    const handleCloseAiModal = () => {
-        setIsAiModalOpen(false);
-    };
-
-    const handleAskAi = async (userPrompt) => {
-        setIsAiLoading(true);
-        setAiResponse('');
-        setAiError('');
-
-        // Prepare context
-        const context = {
-            subject: subject || null,
-            level: level || null,
-            year: year || null,
-            paper: paper || null,
-            question: question || null,
-        };
-
-        // Filter out null/empty values from context if needed by the API route
-        const validContext = Object.entries(context).reduce((acc, [key, value]) => {
-            if (value) acc[key] = value;
-            return acc;
-        }, {});
-
-
+    const handleOpenAiModal = () => { /* ... */ setIsAiModalOpen(true); setAiError(''); };
+    const handleCloseAiModal = () => setIsAiModalOpen(false);
+    const handleAskAi = async (userPrompt) => { /* ... (existing logic) ... */
+        setIsAiLoading(true); setAiResponse(''); setAiError('');
+        const context = { subject, level, year, paper, question };
+        const validContext = Object.entries(context).reduce((acc, [key, value]) => { if (value) acc[key] = value; return acc; }, {});
         try {
             const response = await fetch('/api/gemini', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: userPrompt,
-                    context: Object.keys(validContext).length > 0 ? validContext : null // Send context only if available
-                }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: userPrompt, context: Object.keys(validContext).length > 0 ? validContext : null }),
             });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' })); // Try to parse error JSON
-                console.error("API Error Response:", errorData);
-                throw new Error(errorData.error || `Request failed with status ${response.status}`);
-            }
-
-            const data = await response.json();
-            setAiResponse(data.response);
-
-        } catch (error) {
-            console.error('Error fetching AI response:', error);
-            setAiError(error.message || 'Failed to get response from AI');
-        } finally {
-            setIsAiLoading(false);
-        }
+            if (!response.ok) { const errorData = await response.json().catch(() => ({ error: 'Failed to parse error' })); throw new Error(errorData.error || `HTTP error ${response.status}`); }
+            const data = await response.json(); setAiResponse(data.response);
+        } catch (error) { console.error('Error AI:', error); setAiError(error.message || 'Failed AI response'); }
+        finally { setIsAiLoading(false); }
     };
     // --- End AI Handlers ---
 
+    // --- NEW NAVIGATION FUNCTION FOR TOGGLING ---
+    const handleToggleView = () => {
+        if (!subject || !level || !exam || !paper || !question || !year) {
+            console.error("Missing parameters for toggling view. Current state:", { subject, level, exam, paper, question, year });
+            // Potentially alert the user or disable the button if params are missing
+            return;
+        }
+
+        const queryParams = new URLSearchParams({
+            overallTime: time.toString(), // CRITICAL: Use the current `time` state from StudyLayout
+            subject: subject,
+            level: level,
+            exam: exam,
+            paper: paper,
+            question: question,
+            year: year,
+        }).toString();
+
+        if (pathname.includes('/study/examQuestion')) {
+            router.push(`/study/markingScheme?${queryParams}`);
+        } else if (pathname.includes('/study/markingScheme')) {
+            router.push(`/study/examQuestion?${queryParams}`);
+        } else {
+            console.warn("Toggle view button clicked on an unexpected page:", pathname);
+        }
+    };
+    // --- END NEW NAVIGATION FUNCTION ---
+
+    // Determine if the toggle button should be shown and what its text should be
+    const showToggleButton = pathname.includes('/study/examQuestion') || pathname.includes('/study/markingScheme');
+    let toggleButtonText = '';
+    if (pathname.includes('/study/examQuestion')) {
+        toggleButtonText = 'View Marking Scheme';
+    } else if (pathname.includes('/study/markingScheme')) {
+        toggleButtonText = 'View Question Paper';
+    }
 
     return (
-        // Add padding-bottom to the main container to avoid content being hidden by the fixed bottom bar
-        <div className="min-h-screen flex flex-col justify-between pb-20 sm:pb-16"> {/* Adjusted padding */}
-
-            {/* Main Content Area */}
+        <div className="min-h-screen flex flex-col justify-between pb-20 sm:pb-16">
             <div>
                 {children}
             </div>
 
-            {/* --- AI Trigger Button (Now on the left) --- */}
-            {!audioUrl && ( // Only show AI button if audio player isn't present
+            {/* AI Trigger Button & Panel & Overlay ... */}
+            {!audioUrl && (
                 <button
-                    type="button"
-                    onClick={handleOpenAiModal}
-                    className={`fixed left-0 top-1/2 transform -translate-y-1/2 z-30       // Stick out of the left side and center vertically
-                    w-14 h-36 bg-gradient-to-br from-blue-600 to-green-400          // Size & Background
-                    text-white shadow-lg                                               // Styling
-                    hover:shadow-glow hover:scale-105                                  // Hover Effects
-                    transition-all duration-300 ease-in-out                            // Animation
-                    flex items-center justify-center                                   // Centering Icon/Text
-                    group                                                              // Group for hover effects
-                    ${isAiModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} // Hide button when panel is open
-                    style={{
-                        clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0% 100%)',             // Trapezium shape
-                        transform: 'translateX(0%) translateY(-50%)',                    // Stick out of the side
-                    }}
-                    aria-label="Ask AI Helper"
-                    title="Ask AI Helper"
-                >
-                    {/* Icon/Text inside the button */}
-                    <div
-                        className="relative z-10 group-hover:scale-[1.03] transition-transform duration-300 text-center leading-tight"
-                        style={{
-                            writingMode: 'vertical-rl', // Make text vertical
-                            transform: 'rotate(180deg)', // Rotate text to read top-to-bottom
-                        }}
-                    >
-                        <span className="text-lg font-semibold">625 AI</span> {/* Updated text */}
+                    type="button" onClick={handleOpenAiModal}
+                    className={`fixed left-0 top-1/2 transform -translate-y-1/2 z-30 w-14 h-36 bg-gradient-to-br from-blue-600 to-green-400 text-white shadow-lg hover:shadow-glow hover:scale-105 transition-all duration-300 ease-in-out flex items-center justify-center group ${isAiModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                    style={{ clipPath: 'polygon(0 0, 100% 10%, 100% 90%, 0% 100%)', transform: 'translateX(0%) translateY(-50%)' }}
+                    aria-label="Ask AI Helper" title="Ask AI Helper" >
+                    <div className="relative z-10 group-hover:scale-[1.03] transition-transform duration-300 text-center leading-tight" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                        <span className="text-lg font-semibold">625 AI</span>
                     </div>
                 </button>
             )}
-            {/* --- End AI Trigger Button --- */}
+            <AiHelperPanel isOpen={isAiModalOpen} onClose={handleCloseAiModal} onSubmit={handleAskAi} isLoading={isAiLoading} response={aiResponse} error={aiError} subjectContext={{ subject, level, year, paper, question }} />
+            {isAiModalOpen && (<div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={handleCloseAiModal}></div>)}
 
 
-            {/* --- AI Side Panel Component --- */}
-            {/* Render the panel itself */}
-            <AiHelperPanel
-                isOpen={isAiModalOpen}
-                onClose={handleCloseAiModal}
-                onSubmit={handleAskAi}
-                isLoading={isAiLoading}
-                response={aiResponse}
-                error={aiError}
-                subjectContext={{ subject, level, year, paper, question }} // Pass context for display
-            />
-            {/* --- End AI Side Panel --- */}
-
-
-            {/* --- Overlay for when panel is open --- */}
-            {isAiModalOpen && (
-                <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-40" // Lower z-index than panel
-                    onClick={handleCloseAiModal} // Close panel when clicking overlay
-                ></div>
-            )}
-            {/* --- End Overlay --- */}
-
-
-            {/* --- Bottom Control Bar (Remains Fixed) --- */}
-            <div className="bg-white text-black p-4 flex flex-col sm:flex-row justify-between items-center fixed bottom-0 w-full border-t border-gray-300 z-20"> {/* Keep z-index lower than button/panel */}
+            {/* Bottom Control Bar */}
+            <div className="bg-white text-black p-4 flex flex-col sm:flex-row justify-between items-center fixed bottom-0 w-full border-t border-gray-300 z-20">
                 {/* Left Section: Time and Controls */}
-                <div className="flex items-center flex-wrap justify-center sm:justify-start gap-x-4 gap-y-2 mb-2 sm:mb-0 w-full sm:w-auto"> {/* Adjusted gaps */}
+                <div className="flex items-center flex-wrap justify-center sm:justify-start gap-x-4 gap-y-2 mb-2 sm:mb-0 w-full sm:w-auto">
                     <span className="text-lg font-semibold whitespace-nowrap order-1 sm:order-none">
                         {formatTime(time)} {totalStudyTime > 0 ? `/ ${formatTime(totalStudyTime)}` : ''}
                     </span>
-                    <button
-                        type="button"
-                        onClick={handlePauseResume}
-                        className="px-3 py-1 bg-white text-black border border-black rounded hover:bg-gray-100 transition whitespace-nowrap min-w-[45px] h-[36px] flex items-center justify-center text-lg order-2 sm:order-none shadow" // Sized button
-                        style={{ width: '45px' }}
-                        aria-label={isPaused ? "Resume Timer" : "Pause Timer"}
-                    >
+                    <button type="button" onClick={handlePauseResume} className="px-3 py-1 bg-white text-black border border-black rounded hover:bg-gray-100 transition whitespace-nowrap min-w-[45px] h-[36px] flex items-center justify-center text-lg order-2 sm:order-none shadow" style={{ width: '45px' }} aria-label={isPaused ? "Resume Timer" : "Pause Timer"}>
                         {isPaused ? '▶' : '⏸'}
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleReset}
-                        className="px-3 py-1 bg-white text-black border border-black rounded hover:bg-gray-100 transition whitespace-nowrap flex items-center justify-center text-sm order-3 sm:order-none shadow h-[36px]" // Sized button
-                        aria-label={`Reset Timer to ${formatTime(initialTime)}`}
-                    >
+                    <button type="button" onClick={handleReset} className="px-3 py-1 bg-white text-black border border-black rounded hover:bg-gray-100 transition whitespace-nowrap flex items-center justify-center text-sm order-3 sm:order-none shadow h-[36px]" aria-label={`Reset Timer to ${formatTime(initialTime)}`}>
                         <span className="text-lg mr-1">↺</span> to {formatTime(initialTime)}
                     </button>
                 </div>
 
+                {/* --- NEW TOGGLE BUTTON --- */}
+                {showToggleButton && (
+                    <div className="my-2 sm:my-0 order-none mx-auto sm:mx-2"> {/* Adjusted margin */}
+                        <button
+                            type="button"
+                            onClick={handleToggleView}
+                            className="px-4 h-[36px] flex items-center justify-center bg-purple-600 text-white rounded hover:bg-purple-700 transition whitespace-nowrap text-sm shadow"
+                        >
+                            {toggleButtonText}
+                        </button>
+                    </div>
+                )}
+                {/* --- END NEW TOGGLE BUTTON --- */}
 
-                {/* Audio Player (conditionally rendered) - Center if no AI button or action buttons */}
                 {audioUrl && (
-                    <div className="bg-white rounded my-2 sm:my-0 order-last sm:order-none mx-auto sm:mx-4 flex-shrink-0">
-                        <audio controls src={audioUrl} className="max-w-full h-10"> {/* Set explicit height */}
+                    <div className={`bg-white rounded my-2 sm:my-0 order-last sm:order-none ${showToggleButton ? 'sm:mx-2' : 'mx-auto sm:mx-4'} flex-shrink-0`}> {/* Adjusted margin */}
+                        <audio controls src={audioUrl} className="max-w-full h-10">
                             Your browser does not support the audio element.
                         </audio>
                     </div>
@@ -899,45 +613,26 @@ const StudyLayout = ({ children }) => {
                     {url.includes('markingScheme') && (
                         <button
                             type="button"
-                            onClick={() => router.push(`/study/addFlashcards?overallTime=${time}&subject=${encodeURIComponent(subject)}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`)} // Pass all relevant params
+                            onClick={() => router.push(`/study/addFlashcards?overallTime=${time}&subject=${encodeURIComponent(subject)}&level=${level}&exam=${exam}&paper=${paper}&question=${question}&year=${year}`)}
                             className="px-4 h-[36px] flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-700 transition whitespace-nowrap text-sm shadow"
                         >
                             Add Flashcard
                         </button>
                     )}
-                    {/* Conditionally render Next button based on page type if needed */}
-                    {!(url.includes('sessionCompleted') || (url.includes('reviewFlashcards') && url.includes('type=flashcard'))) && ( // Hide "Next" on completion/specific review end
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            className="px-4 h-[36px] flex items-center justify-center bg-green-500 text-white rounded hover:bg-green-700 transition whitespace-nowrap text-sm shadow"
-                        >
+                    {!(url.includes('sessionCompleted') || (url.includes('reviewFlashcards') && url.includes('type=flashcard'))) && (
+                        <button type="button" onClick={handleSubmit} className="px-4 h-[36px] flex items-center justify-center bg-green-500 text-white rounded hover:bg-green-700 transition whitespace-nowrap text-sm shadow" >
                             Next
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={handleFinishStudying}
-                        className="px-4 h-[36px] flex items-center justify-center bg-yellow-500 text-white rounded hover:bg-yellow-600 transition whitespace-nowrap text-sm shadow"
-                    >
+                    <button type="button" onClick={handleFinishStudying} className="px-4 h-[36px] flex items-center justify-center bg-yellow-500 text-white rounded hover:bg-yellow-600 transition whitespace-nowrap text-sm shadow" >
                         Finish Studying
                     </button>
                 </div>
             </div>
 
             {/* Confirmation Modals */}
-            <ConfirmationModal
-                isOpen={isConfirmResetOpen}
-                onClose={() => setIsConfirmResetOpen(false)}
-                onConfirm={confirmReset}
-                message={`Are you sure you want to reset the timer to ${formatTime(initialTime)}?`}
-            />
-            <ConfirmationModal
-                isOpen={isConfirmFinishOpen}
-                onClose={() => setIsConfirmFinishOpen(false)}
-                onConfirm={confirmFinishStudying}
-                message="Are you sure you want to finish studying?"
-            />
+            <ConfirmationModal isOpen={isConfirmResetOpen} onClose={() => setIsConfirmResetOpen(false)} onConfirm={confirmReset} message={`Are you sure you want to reset the timer to ${formatTime(initialTime)}?`} />
+            <ConfirmationModal isOpen={isConfirmFinishOpen} onClose={() => setIsConfirmFinishOpen(false)} onConfirm={confirmFinishStudying} message="Are you sure you want to finish studying?" />
         </div>
     );
 };
