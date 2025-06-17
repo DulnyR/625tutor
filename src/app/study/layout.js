@@ -1,5 +1,6 @@
 //src/app/study/layout.js
 "use client";
+
 import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
