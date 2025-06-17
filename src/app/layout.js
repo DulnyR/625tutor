@@ -4,10 +4,11 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from "../lib/supabaseClient";
 import PdfWorkerSetup from "../lib/PdfWorkerSetup";
 import LoadingScreen from "./study/loadingScreen";
+import FeedbackButton from "../components/FeedbackButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +30,7 @@ export default function RootLayout({ children }) {
   const [horizontalMenuOpen, setHorizontalMenuOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   let subject = searchParams.get('subject');
 
   if (subject && subject.includes('Design')) {
@@ -168,6 +170,7 @@ export default function RootLayout({ children }) {
           <LoadingScreen />
         ) : (
           <>
+            {pathname === '/dashboard' && <FeedbackButton />}
             {/* Render the banner */}
             <div className="bg-white text-black w-full py-6 fixed top-0 left-0 border-b border-gray flex items-center justify-center z-10">
               {/* Left content */}

@@ -18,7 +18,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [deadlines, setDeadlines] = useState([]);
   const [showAddDeadlineModal, setShowAddDeadlineModal] = useState(false);
-  const [deadlineToDelete, setDeadlineToDelete] = useState(null); 
+  const [deadlineToDelete, setDeadlineToDelete] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   // --- State to control Joyride visibility ---
   const [runTutorial, setRunTutorial] = useState(false);
@@ -108,18 +108,18 @@ const Dashboard = () => {
 
   const handleConfirmDelete = async () => {
     if (!deadlineToDelete) return; // Safety check
-  
+
     try {
       const { error } = await supabase
         .from('deadlines')
         .delete()
         .eq('id', deadlineToDelete.id); // Use the ID from the state
-  
+
       if (error) throw error;
-  
+
       // Update UI
       setDeadlines(deadlines.filter(d => d.id !== deadlineToDelete.id));
-  
+
     } catch (err) {
       console.error('Error deleting deadline:', err.message);
       alert('Failed to delete deadline. Please try again.');
@@ -263,9 +263,9 @@ const Dashboard = () => {
         <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
           <h2 className="text-2xl font-bold mb-4 text-black">Confirm Deletion</h2>
           <p className="text-gray-600 mb-8">
-            Are you sure you want to delete the deadline for 
+            Are you sure you want to delete the deadline for
             <span className="font-semibold text-purple-600"> {deadlineTitle}</span>?
-            <br/><br/>
+            <br /><br />
             <span className="font-bold text-red-600">This action cannot be undone.</span>
           </p>
           <div className="flex justify-center space-x-4">
@@ -445,7 +445,7 @@ const Dashboard = () => {
     {
       target: '.greeting-box',
       content: 'Welcome to 625 Tutor! Here\'s a quick tour of your dashboard.',
-      disableBeacon: true, 
+      disableBeacon: true,
     },
     {
       target: '.recommendation-box',
@@ -468,7 +468,7 @@ const Dashboard = () => {
       content: "This is your deadline tracker. Click the '+' button to add important dates for exams or projects and we'll help you stay on top of them!",
     },
     {
-      target: '.subjects-section', 
+      target: '.subjects-section',
       content: 'Here are your subjects. You can start guided study, add flashcards, or practice exam questions if you want to study a specific subject.',
     },
   ];
@@ -541,15 +541,15 @@ const Dashboard = () => {
 
       {showAddDeadlineModal && <AddDeadlineModal />}
       {isConfirmModalOpen && (
-      <ConfirmDeleteModal
-        deadlineTitle={deadlineToDelete?.title}
-        onConfirm={handleConfirmDelete}
-        onClose={() => {
-          setIsConfirmModalOpen(false);
-          setDeadlineToDelete(null);
-        }}
-      />
-    )}
+        <ConfirmDeleteModal
+          deadlineTitle={deadlineToDelete?.title}
+          onConfirm={handleConfirmDelete}
+          onClose={() => {
+            setIsConfirmModalOpen(false);
+            setDeadlineToDelete(null);
+          }}
+        />
+      )}
 
       {/* --- Original Layout Structure --- */}
       <aside
@@ -650,18 +650,18 @@ const Dashboard = () => {
         </div>
 
         {/* --- Upcoming Deadlines Box --- */}
-        <div className="deadlines-box bg-white p-4 shadow-lg rounded-lg flex flex-col flex-grow">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-gray-700">Upcoming Deadlines</h3>
+        <div className="deadlines-box bg-white p-6 shadow-lg rounded-lg flex flex-col flex-grow overflow-hidden">
+          <div className="flex justify-between items-center mb-6 flex-shrink-0">
+            <h3 className="font-bold text-gray-700 text-2xl">Upcoming Deadlines</h3>
             <button onClick={() => setShowAddDeadlineModal(true)} className="bg-purple-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-purple-600 transition-colors text-xl font-light">+</button>
           </div>
-          <div className="space-y-3 overflow-y-auto pr-2 flex-grow">
+          <div className="space-y-4 overflow-y-scroll border-t border-gray-200 flex-grow -mx-6 px-6">
             {deadlines.length > 0 ? (
               deadlines.map(deadline => (
                 <div key={deadline.id} className="bg-gray-50 p-3 rounded-lg flex items-center justify-between border-l-4 border-purple-400">
                   <div>
                     <p className="font-semibold text-black">{deadline.title}</p>
-                    <p className="text-sm text-gray-500">{deadline.subject_name} ({deadline.type}) - <span className="font-medium text-red-600">{format(new Date(deadline.due_date), 'MMM dd, yyyy')}</span></p>
+                    <p className="text-sm text-gray-500">{deadline.subject_name} ({deadline.type}) - <span className="font-medium text-black">{format(new Date(deadline.due_date), 'MMM dd, yyyy')}</span></p>
                   </div>
                   <button onClick={() => promptForDelete(deadline)} className="text-gray-400 hover:text-red-500">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -669,7 +669,7 @@ const Dashboard = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center text-gray-400 py-6">
+              <div className="text-center text-gray-400 py-10">
                 <p>No upcoming deadlines.</p>
                 <p className="text-sm">Click the '+' to add one!</p>
               </div>
