@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Joyride, { STATUS } from 'react-joyride';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import LoadingScreen from '../study/loadingScreen';
@@ -20,8 +19,8 @@ const DashboardClient = () => {
   const [showAddDeadlineModal, setShowAddDeadlineModal] = useState(false);
   const [deadlineToDelete, setDeadlineToDelete] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  // --- State to control Joyride visibility ---
-  const [runTutorial, setRunTutorial] = useState(false);
+  // --- State to control welcome modal visibility ---
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // --- Fetch data on mount ---
   useEffect(() => {
@@ -44,23 +43,17 @@ const DashboardClient = () => {
     }
   }, [loading, subjects, router]);
 
-  // --- Decide when to show the tutorial ---
+  // --- Show welcome modal for new users ---
   useEffect(() => {
-    // Check if the user has seen the tutorial before (using localStorage)
-    // Ensure this runs only on the client-side
+    // Check if the user has seen the welcome message before
     if (typeof window !== 'undefined') {
-      const hasSeenTutorial = localStorage.getItem('hasSeenDashboardTutorial');
-
-      // Run if not loading AND the user hasn't seen it before
-      if (!loading && !hasSeenTutorial) {
-        // Small delay to ensure elements are rendered
-        const timer = setTimeout(() => {
-          setRunTutorial(true);
-        }, 500); // Adjust delay if needed
-        return () => clearTimeout(timer); // Cleanup timer
+      const hasSeenWelcome = localStorage.getItem('hasSeenDashboardWelcome');
+      
+      if (!loading && !hasSeenWelcome) {
+        setShowWelcomeModal(true);
       }
     }
-  }, [loading]); // Depend only on loading state
+  }, [loading]);
 
   useEffect(() => {
     // Scroll to top on mount
@@ -68,6 +61,45 @@ const DashboardClient = () => {
       window.scrollTo(0, 0);
     }
   }, []);
+
+  // Welcome Modal Component
+  const WelcomeModal = () => {
+    const handleClose = () => {
+      setShowWelcomeModal(false);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hasSeenDashboardWelcome', 'true');
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
+          <h2 className="text-3xl font-bold mb-6 text-black text-center">Welcome to 625 Tutor! 🎉</h2>
+          <div className="space-y-4 text-gray-700">
+            <p className="text-lg">Here's a quick overview of your dashboard:</p>
+            <ul className="space-y-2 list-disc list-inside">
+              <li><strong>625Tutor Recommendation:</strong> We'll suggest which subject to study based on your progress and confidence levels.</li>
+              <li><strong>Daily Goal:</strong> Track your daily study progress - aim for 60 minutes each day!</li>
+              <li><strong>Study Stats:</strong> Monitor your total study time and daily streak.</li>
+              <li><strong>Deadlines:</strong> Add important exam or project dates to stay organized.</li>
+              <li><strong>Subjects:</strong> Access guided study, flashcards, or exam questions for each subject.</li>
+            </ul>
+            <p className="text-center text-sm text-gray-500 mt-6">
+              Remember, consistency is key!
+            </p>
+          </div>
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={handleClose}
+              className="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+            >
+              Let's Get Started!
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // --- CORRECTED: Function to fetch deadlines ---
   const fetchDeadlines = async () => {
@@ -440,55 +472,6 @@ const DashboardClient = () => {
     return subjectName;
   };
 
-  // --- Define Steps for Joyride ---
-  const steps = [
-    {
-      target: '.greeting-box',
-      content: 'Welcome to 625 Tutor! Here\'s a quick tour of your dashboard.',
-      disableBeacon: true,
-    },
-    {
-      target: '.recommendation-box',
-      content: 'This is your recommended subject to study based on your progress and confidence levels along with the type of study we recommend.',
-    },
-    {
-      target: '.daily-goal-box',
-      content: 'Track your daily study goal here. Aim to complete an hour of study each day!',
-    },
-    {
-      target: '.total-study-box',
-      content: 'Here you will see the total time you have studied.',
-    },
-    {
-      target: '.streak-box',
-      content: 'Here you will see how many days in a row you have studied.',
-    },
-    {
-      target: '.deadlines-box',
-      content: "This is your deadline tracker. Click the '+' button to add important dates for exams or projects and we'll help you stay on top of them!",
-    },
-    {
-      target: '.subjects-section',
-      content: 'Here are your subjects. You can start guided study, add flashcards, or practice exam questions if you want to study a specific subject.',
-    },
-  ];
-
-  // --- Joyride Callback ---
-  const handleJoyrideCallback = (data) => {
-    const { status } = data;
-    const finishedStatuses = [STATUS.FINISHED, STATUS.SKIPPED];
-
-    if (finishedStatuses.includes(status)) {
-      setRunTutorial(false); // Stop the tour
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hasSeenDashboardTutorial', 'true'); // Mark as seen
-      }
-    }
-    // You can add other actions based on different statuses (e.g., STATUS.ERROR)
-    console.log('Joyride status:', status);
-  };
-
-
   if (loading) {
     return <LoadingScreen />;
   }
@@ -496,48 +479,7 @@ const DashboardClient = () => {
   // --- Original JSX Layout ---
   return (
     <div className="bg-gradient-to-br from-purple-300 to-blue-200 flex mt-20" style={{ minHeight: 'calc(100vh - 6rem)' }}>
-      {/* --- Joyride Component (with modifications) --- */}
-      <Joyride
-        steps={steps}
-        run={runTutorial} // Use the state variable to control run
-        continuous // Go to next step on button click
-        showSkipButton // Allow users to skip
-        showProgress // Show step count (e.g., 2/6)
-        spotlightPadding={5}
-        styles={{
-          options: {
-            zIndex: 10000, // Ensure it's above other elements
-            // You can customize colors further if you like
-            arrowColor: '#fff',
-            backgroundColor: '#fff',
-            primaryColor: '#8b5cf6', // Purple to match theme
-            textColor: '#374151',
-          },
-          spotlight: {
-            borderRadius: 8, // Optional: Rounding to match elements
-          },
-          tooltip: {
-            borderRadius: 6, // Style the tooltip box
-          },
-          // Optional: Adjust button styles slightly if needed
-          buttonNext: {
-            fontSize: '14px',
-          },
-          buttonBack: {
-            fontSize: '14px',
-            marginRight: 8,
-          },
-          buttonSkip: {
-            fontSize: '14px',
-            color: '#ef4444', // Red skip button
-          }
-        }}
-        locale={{
-          last: 'Finish', // <<< CHANGE 3: Change final button text
-          skip: 'Skip Tour', // Optional: Customize skip button text
-        }}
-        callback={handleJoyrideCallback} // Handle finish/skip events
-      />
+      {showWelcomeModal && <WelcomeModal />}
       {showAddDeadlineModal && <AddDeadlineModal />}
       {isConfirmModalOpen && (
         <ConfirmDeleteModal
