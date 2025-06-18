@@ -73,7 +73,7 @@ const ContactClient = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 py-16 px-6 mt-20">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 py-16 px-6 mt-24">
             <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-8">
                 <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">Contact Us</h1>
                 <p className="text-gray-600 text-center mb-8">

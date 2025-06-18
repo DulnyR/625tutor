@@ -15,6 +15,25 @@ const AddFlashcardsClient = () => {
     const searchParams = useSearchParams();
     const subjectFromAddress = searchParams.get('subject');
 
+    // Prevent scrolling on mount, restore on unmount, but allow scrolling when flashcards are added
+    useEffect(() => {
+        if (flashcards.length === 0) {
+            // Disable scrolling when no flashcards
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        } else {
+            // Enable scrolling when flashcards are present
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        }
+        
+        return () => {
+            // Re-enable scrolling when component unmounts
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        };
+    }, [flashcards.length]); // Depend on flashcards.length to update when cards are added/removed
+
     useEffect(() => {
         if (subjectFromAddress) {
             setSubject(subjectFromAddress);
@@ -29,7 +48,17 @@ const AddFlashcardsClient = () => {
 
         setLoading(true);
 
-        const newFlashcard = { subject, front: question, back: answer };
+        const newFlashcard = { 
+            subject, 
+            front: question, 
+            back: answer,
+            // Set defaults for spaced repetition - make immediately available for review
+            ease_factor: 2.5,
+            repetitions: 0,
+            interval: 0,
+            last_reviewed: null,
+            next_review: new Date().toISOString() // Make available immediately
+        };
         setFlashcards([...flashcards, newFlashcard]);
         setQuestion('');
         setAnswer('');
@@ -137,7 +166,17 @@ const AddFlashcardsClient = () => {
                 // Parse each line into a flashcard
                 const importedFlashcards = lines.map(line => {
                     const [front, back] = line.split('\t'); // Split by tab character
-                    return { subject, front, back };
+                    return { 
+                        subject, 
+                        front, 
+                        back,
+                        // Set defaults for spaced repetition - make immediately available for review
+                        ease_factor: 2.5,
+                        repetitions: 0,
+                        interval: 0,
+                        last_reviewed: null,
+                        next_review: new Date().toISOString() // Make available immediately
+                    };
                 }).filter(card => card.front && card.back); // Filter out invalid lines
 
                 // Add the flashcards to the state

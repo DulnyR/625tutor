@@ -222,7 +222,7 @@ export default function RootLayoutClient({ children }) {
       ) : (
         <>
           {pathname === '/dashboard' && <FeedbackButton />}
-          <div className="pt-4"> {/* Padding to push content below fixed header */}
+          <div className=""> {/* Remove padding to eliminate black bar */}
             {children}
           </div>
         </>

@@ -14,6 +14,19 @@ const ReviewFlashcardsClient = () => {
     const [loading, setLoading] = useState(true);
     const [subject, setSubject] = useState(''); // Use state for subject if it's derived and used in effects
 
+    // Prevent scrolling on mount, restore on unmount
+    useEffect(() => {
+        // Disable scrolling
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        
+        return () => {
+            // Re-enable scrolling when component unmounts
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        };
+    }, []);
+
     useEffect(() => {
         let currentSubject = subjectParam;
         if (currentSubject && currentSubject.includes('Design')) {
@@ -202,7 +215,7 @@ const ReviewFlashcardsClient = () => {
 
     if (!subject) {
          return (
-            <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+            <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-purple-500 text-black flex justify-center items-center pt-20 overflow-hidden">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
                     <p className="text-2xl mb-4">No subject selected for review.</p>
                 </div>
@@ -212,7 +225,7 @@ const ReviewFlashcardsClient = () => {
     
     if (flashcards.length === 0) {
         return (
-            <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+            <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-purple-500 text-black flex justify-center items-center pt-20 overflow-hidden">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
                     <p className="text-2xl mb-4">No flashcards due for review in {subject}.</p>
                 </div>
@@ -222,7 +235,7 @@ const ReviewFlashcardsClient = () => {
 
     if (currentFlashcardIndex >= flashcards.length) {
         return (
-            <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+            <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-purple-500 text-black flex justify-center items-center pt-20 overflow-hidden">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
                     <p className="text-2xl mb-4">All flashcards for {subject} reviewed for this session!</p>
                 </div>
@@ -235,7 +248,7 @@ const ReviewFlashcardsClient = () => {
     if (!currentFlashcard) {
         console.error("Current flashcard is undefined, though checks passed.");
         return (
-             <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center">
+             <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-purple-500 text-black flex justify-center items-center pt-20 overflow-hidden">
                 <div className="bg-white p-6 shadow-lg rounded-lg w-full max-w-md text-center">
                     <p className="text-2xl mb-4">Error loading flashcard content.</p>
                 </div>
@@ -252,7 +265,7 @@ const ReviewFlashcardsClient = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 text-black justify-center items-center p-4">
+        <div className="fixed inset-0 bg-gradient-to-br from-orange-500 to-purple-500 text-black flex justify-center items-center p-4 pt-20 overflow-hidden">
             <div className="w-full max-w-2xl"> {/* Adjusted max-width for better focus */}
                 {/* Stacking effect can be complex with many cards; showing one primary card clearly is often better */}
                 {/* Current Flashcard Display */}

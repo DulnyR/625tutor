@@ -364,30 +364,38 @@ const StudyLayout = ({ children }) => {
                         .eq('subject', subject)
                         .eq('exam', exam) // Use the 'exam' state which should be populated
                         .single();
-                    if (examDataError) console.log('Error fetching exam data:', examDataError);
-                    if (!examData) throw new Error('Exam not found. Verify params.');
-                    const examId = examData.id;
-                    const timeSpent = time - initialTime;
-                    console.log(`userId: ${userId}, examId: ${examId}, timeSpent: ${timeSpent}`);
-                    if (timeSpent > 0) {
-                        const { data: examStudyData, error: examStudySelectError } = await supabase
-                            .from('user_exam_study').select('time').eq('user_id', userId).eq('exam_id', examId).maybeSingle();
-                        if (examStudySelectError) throw new Error('Failed to fetch user exam study data.');
-                        if (examStudyData) {
-                            const newTimeSpent = examStudyData.time + timeSpent;
-                            const { error: updateError } = await supabase.from('user_exam_study').update({ time: newTimeSpent }).eq('user_id', userId).eq('exam_id', examId);
-                            if (updateError) throw new Error('Failed to update user exam study time.');
-                        } else {
-                            const { error: insertError } = await supabase.from('user_exam_study').insert({ user_id: userId, exam_id: examId, time: timeSpent });
-                            if (insertError) throw new Error('Failed to insert user exam study time.');
-                        }
-                        console.log(`Recorded ${timeSpent} seconds for exam ID ${examId}`);
+                    
+                    if (examDataError) {
+                        console.log('Error fetching exam data:', examDataError);
+                        console.log('Exam lookup failed, but continuing with navigation...');
+                    } else if (!examData) {
+                        console.log('Exam not found in database, but continuing with navigation...');
                     } else {
-                        console.log('No time spent on this page, skipping time record.');
+                        // Only proceed with time tracking if exam was found
+                        const examId = examData.id;
+                        const timeSpent = time - initialTime;
+                        console.log(`userId: ${userId}, examId: ${examId}, timeSpent: ${timeSpent}`);
+                        if (timeSpent > 0) {
+                            const { data: examStudyData, error: examStudySelectError } = await supabase
+                                .from('user_exam_study').select('time').eq('user_id', userId).eq('exam_id', examId).maybeSingle();
+                            if (examStudySelectError) throw new Error('Failed to fetch user exam study data.');
+                            if (examStudyData) {
+                                const newTimeSpent = examStudyData.time + timeSpent;
+                                const { error: updateError } = await supabase.from('user_exam_study').update({ time: newTimeSpent }).eq('user_id', userId).eq('exam_id', examId);
+                                if (updateError) throw new Error('Failed to update user exam study time.');
+                            } else {
+                                const { error: insertError } = await supabase.from('user_exam_study').insert({ user_id: userId, exam_id: examId, time: timeSpent });
+                                if (insertError) throw new Error('Failed to insert user exam study time.');
+                            }
+                            console.log(`Recorded ${timeSpent} seconds for exam ID ${examId}`);
+                        } else {
+                            console.log('No time spent on this page, skipping time record.');
+                        }
                     }
                 } catch (error) {
                     console.error('Error processing exam study time:', error.message || error);
-                    alert(error.message || 'An unexpected error occurred.');
+                    // Don't show alert for exam lookup failures, just log and continue
+                    console.log('Continuing with navigation despite exam lookup error...');
                 }
             } else {
                 console.warn("Missing subject, exam type, or level for exam time tracking.");

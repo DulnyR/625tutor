@@ -462,7 +462,7 @@ const MarkingSchemeClient = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center p-4 md:p-8 pb-24">
-            <div className="max-w-4xl w-full bg-white rounded-lg shadow-xl p-4 md:p-8 space-y-6 mt-20 md:mt-24">
+            <div className="max-w-4xl w-full bg-white rounded-lg shadow-xl p-4 md:p-8 space-y-6 mt-24 md:mt-24">
                 <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-4" style={{ paddingTop: '1rem' }}>Marking Scheme</h1>
                 {error && <div className="text-center p-4 bg-red-100 text-red-700 rounded mb-4">{error}</div>}
                 

@@ -48,7 +48,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 mt-20">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-purple-50 mt-24">
       {/* Hero Section */}
       <section className="py-16 px-6 text-center pt-20 md:pt-24">
         <div className="max-w-4xl mx-auto">

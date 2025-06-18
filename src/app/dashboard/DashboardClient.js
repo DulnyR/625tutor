@@ -478,7 +478,7 @@ const DashboardClient = () => {
 
   // --- Original JSX Layout ---
   return (
-    <div className="bg-gradient-to-br from-purple-300 to-blue-200 flex mt-20" style={{ minHeight: 'calc(100vh - 6rem)' }}>
+    <div className="bg-gradient-to-br from-purple-300 to-blue-200 flex mt-24" style={{ minHeight: 'calc(100vh - 6rem)' }}>
       {showWelcomeModal && <WelcomeModal />}
       {showAddDeadlineModal && <AddDeadlineModal />}
       {isConfirmModalOpen && (
@@ -630,7 +630,7 @@ const DashboardClient = () => {
             className="subjects-section space-y-4 overflow-y-scroll border-t border-b border-gray-200 rounded-lg flex-grow"
           >
             {subjects.length > 0 ? (
-              subjects.map((subject) => (
+              [...subjects].sort((a, b) => a.subject.localeCompare(b.subject)).map((subject) => (
                 <div
                   key={`${subject.subject}-${subject.higher_level}`} // More robust key
                   className="bg-white p-4 rounded-lg shadow-lg border border-purple-200"
