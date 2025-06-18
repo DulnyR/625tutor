@@ -8,6 +8,8 @@ import { supabase } from "../lib/supabaseClient";
 import PdfWorkerSetup from "../lib/PdfWorkerSetup";
 import LoadingScreen from "./study/loadingScreen";
 import FeedbackButton from "../components/FeedbackButton";
+import MobileFallback from "../components/MobileFallback";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // The Header component now lives inside the layout client for simplicity,
 // as it is tightly coupled with the layout's state.
@@ -133,10 +135,18 @@ export default function RootLayoutClient({ children }) {
   const [horizontalMenuOpen, setHorizontalMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchUserData();
   }, [pathname]);
+
+  if (isMobile) {
+    return (
+      <MobileFallback />
+    );
+  }
+
 
   const fetchUserData = async () => {
     setIsLoading(true);
