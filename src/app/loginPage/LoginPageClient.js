@@ -108,13 +108,23 @@ export default function LoginPageClient() {
 
   const handleForgotPassword = async () => {
     setError(null);
+    
+    if (!email) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    
+    const redirectUrl = `${window.location.origin}/resetPassword`;
+    console.log('Sending reset email with redirect URL:', redirectUrl);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/resetPassword`,
+      redirectTo: redirectUrl,
     });
+    
     if (error) {
       setError(error.message);
     } else {
-      setError('Password reset email sent. Please check your inbox.');
+      setError('Password reset email sent. Please check your inbox and spam folder.');
     }
   };
 

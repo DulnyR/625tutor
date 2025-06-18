@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-//import Joyride, { STATUS } from 'react-joyride';
+import Joyride, { STATUS } from 'react-joyride';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 import LoadingScreen from '../study/loadingScreen';
@@ -21,7 +21,7 @@ const DashboardClient = () => {
   const [deadlineToDelete, setDeadlineToDelete] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   // --- State to control Joyride visibility ---
-  // const [runTutorial, setRunTutorial] = useState(false);
+  const [runTutorial, setRunTutorial] = useState(false);
 
   // --- Fetch data on mount ---
   useEffect(() => {
@@ -495,8 +495,8 @@ const DashboardClient = () => {
 
   // --- Original JSX Layout ---
   return (
-    <div className="bg-gradient-to-br from-purple-300 to-blue-200 flex mt-24" style={{ minHeight: 'calc(100vh - 6rem)' }}>
-      {/* --- Joyride Component (with modifications) --- 
+    <div className="bg-gradient-to-br from-purple-300 to-blue-200 flex mt-20" style={{ minHeight: 'calc(100vh - 6rem)' }}>
+      {/* --- Joyride Component (with modifications) --- */}
       <Joyride
         steps={steps}
         run={runTutorial} // Use the state variable to control run
@@ -538,7 +538,6 @@ const DashboardClient = () => {
         }}
         callback={handleJoyrideCallback} // Handle finish/skip events
       />
-      */}
       {showAddDeadlineModal && <AddDeadlineModal />}
       {isConfirmModalOpen && (
         <ConfirmDeleteModal

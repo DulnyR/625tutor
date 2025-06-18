@@ -140,7 +140,7 @@ const SelectConfidenceClient = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center justify-center p-8 mt-24">
+        <div className="min-h-screen bg-gradient-to-br from-orange-500 to-purple-500 flex flex-col items-center justify-center p-8 mt-20">
             <div className="max-w-3xl w-full bg-white rounded-lg shadow-xl p-8 space-y-6 text-black">
                 <h1 className="text-4xl font-bold text-center text-black mb-4">How Confident Are You In These Subjects?</h1>
                 <div className="w-full max-w-2xl mx-auto">
