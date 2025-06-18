@@ -19,11 +19,22 @@ const ContactClient = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+        
+        // Add loading state
+        setFormStatus('Sending message...');
+    
         try {
+            // Validate form data
+            if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+                throw new Error('Please fill in all fields');
+            }
+    
+            // Initialize EmailJS if not already done
+            emailjs.init('t6AIpPEx5uTKbEs1m');
+    
             // Use EmailJS to send the email
             const result = await emailjs.send(
-                'service_0hj2xz8', // service ID
+                '625tutor', // service ID
                 'template_isbh23j', // template ID
                 {
                     from_name: formData.name,
@@ -32,20 +43,32 @@ const ContactClient = () => {
                 },
                 't6AIpPEx5uTKbEs1m' // public key
             );
-
+    
+            // Send confirmation email (don't await this one to avoid blocking)
             emailjs.send("625tutor", "template_qxm0z4i", {
                 name: formData.name,
                 email: formData.email,
+            }, 't6AIpPEx5uTKbEs1m').catch(err => {
+                console.warn('Confirmation email failed:', err);
             });
-
+    
             console.log('Email sent successfully:', result.text);
             setFormStatus('Thank you for reaching out! We will get back to you soon.');
             setFormData({ name: '', email: '', message: '' });
-
-
+    
         } catch (error) {
             console.error('Error sending email:', error);
-            setFormStatus('Something went wrong. Please try again later.');
+            
+            // More specific error messages
+            let errorMessage = 'Something went wrong. Please try again later.';
+            
+            if (error.text) {
+                errorMessage = `Failed to send email: ${error.text}`;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            setFormStatus(<span style={{ color: 'red' }}>{errorMessage}</span>);
         }
     };
 

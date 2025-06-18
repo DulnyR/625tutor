@@ -8,22 +8,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 const STATIC_WORKER_FILENAME = 'pdf.worker.min.js'; // Or 'pdf.worker.js' or 'pdf.worker.entry.js' if you are sure
 const WORKER_URL = `/${STATIC_WORKER_FILENAME}`; // Path relative to the /public folder
 
-console.log(`[PdfWorkerSetup] Attempting to set worker. Target URL: ${WORKER_URL}`);
-console.log(`[PdfWorkerSetup] Current PDF.js library version: ${pdfjsLib.version}`); // Should be ~3.11.174
-
 // This top-level execution runs when the module is first imported.
 // It's generally preferred for setting up global configurations like this.
 if (typeof window !== 'undefined') {
-  console.log('[PdfWorkerSetup] Top-level: typeof window is NOT undefined (Client-side).');
-  console.log('[PdfWorkerSetup] Top-level: Current GlobalWorkerOptions.workerSrc (BEFORE setting):', pdfjsLib.GlobalWorkerOptions.workerSrc);
 
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
-    console.log('[PdfWorkerSetup] Top-level: GlobalWorkerOptions.workerSrc HAS BEEN SET to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
   } else {
-    // If it's already set, and it's different from what we expect, it might be an issue
-    // or set by another part of the application earlier.
-    console.log('[PdfWorkerSetup] Top-level: GlobalWorkerOptions.workerSrc was ALREADY SET to:', pdfjsLib.GlobalWorkerOptions.workerSrc);
     if (pdfjsLib.GlobalWorkerOptions.workerSrc !== WORKER_URL) {
         console.warn(`[PdfWorkerSetup] Top-level: Existing workerSrc (${pdfjsLib.GlobalWorkerOptions.workerSrc}) differs from expected (${WORKER_URL}). This might be intentional or an issue.`);
     }
